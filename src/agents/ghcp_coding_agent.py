@@ -1,0 +1,350 @@
+"""
+GHCP Coding Agent using GitHub Copilot SDK for code generation and hypothesis validation.
+
+This agent uses the github-copilot-sdk to leverage Copilot's agentic runtime
+with built-in MCP server support for intelligent code and CLI generation.
+"""
+
+import asyncio
+from typing import Annotated
+
+from pydantic import BaseModel, Field
+
+from src.agents.base import AZURE_MCP_URL, MICROSOFT_LEARN_MCP_URL
+from src.lib.logging import get_logger
+
+# GitHub Copilot SDK imports
+try:
+    from copilot import CopilotClient, CopilotSession, define_tool, MCPRemoteServerConfig
+    COPILOT_SDK_AVAILABLE = True
+except ImportError:
+    COPILOT_SDK_AVAILABLE = False
+    CopilotClient = None
+    CopilotSession = None
+    define_tool = lambda **kwargs: lambda f: f  # no-op decorator
+    MCPRemoteServerConfig = None
+
+# For as_tool() compatibility with agent_framework
+from agent_framework import ai_function
+
+
+logger = get_logger(__name__)
+
+
+# =============================================================================
+# Agent Instructions
+# =============================================================================
+
+GHCP_CODING_INSTRUCTIONS = """You are an Azure Hypothesis Validator and Code Generation Expert.
+
+You help validate technical hypotheses about Azure services by:
+1. Creating test plans with Azure resources
+2. Generating Azure CLI commands for deployment
+3. Executing commands (with user approval)
+4. Collecting metrics and generating verdicts
+
+## Key Rules
+
+- **NEVER** deploy resources without explicit user approval
+- Always estimate costs before proposing deployments
+- Clean up ALL resources after testing
+- Log all Azure CLI commands for audit purposes
+- Provide clear metrics-based verdicts
+
+## Response Format
+
+For test plans:
+- State the hypothesis being tested
+- List all resources that will be deployed
+- Explain the methodology
+- Provide cost estimates
+- Request explicit approval
+
+For results:
+- State the verdict clearly (CONFIRMED, REFUTED, PARTIAL, INCONCLUSIVE)
+- Support with collected metrics
+- Include confidence level
+- Confirm resource cleanup"""
+
+
+# =============================================================================
+# Custom Tools (defined with @define_tool decorator)
+# =============================================================================
+
+class CreateTestPlanParams(BaseModel):
+    """Parameters for creating a test plan."""
+    hypothesis: str = Field(description="The hypothesis to validate (e.g., 'Azure Functions can handle 1000 concurrent requests')")
+    max_cost_usd: float = Field(default=50.0, description="Maximum allowed cost for the test in USD")
+    max_duration_minutes: int = Field(default=30, description="Maximum duration for the test in minutes")
+
+
+@define_tool(description="Create a test plan for validating an Azure hypothesis")
+async def create_test_plan(params: CreateTestPlanParams) -> str:
+    """Create a test plan for validating a hypothesis about Azure services."""
+    import uuid
+    plan_id = str(uuid.uuid4())[:8]
+    
+    return f"""## Test Plan Created
+
+**Plan ID**: {plan_id}
+**Hypothesis**: {params.hypothesis}
+
+### Budget Constraints
+- Maximum Cost: ${params.max_cost_usd:.2f} USD
+- Maximum Duration: {params.max_duration_minutes} minutes
+
+### Status
+⚠️ **PENDING APPROVAL** - This plan requires explicit approval before execution.
+
+### Next Steps
+1. Review the hypothesis and constraints
+2. Approve the plan to proceed with resource deployment
+3. System will deploy resources, run tests, and clean up automatically
+
+To approve, respond with: "Approved - execute plan {plan_id}" """
+
+
+class GenerateCLIParams(BaseModel):
+    """Parameters for generating Azure CLI commands."""
+    resource_type: str = Field(description="Azure resource type (e.g., 'webapp', 'function', 'storage', 'cosmosdb')")
+    resource_name: str = Field(description="Name for the resource")
+    resource_group: str = Field(description="Resource group name")
+    location: str = Field(default="eastus", description="Azure region (e.g., 'eastus', 'westus2', 'westeurope')")
+
+
+@define_tool(description="Generate Azure CLI command for deploying a resource")
+async def generate_cli_command(params: GenerateCLIParams) -> str:
+    """Generate Azure CLI command for deploying an Azure resource."""
+    templates = {
+        "webapp": f"az webapp create --name {params.resource_name} --resource-group {params.resource_group} --location {params.location} --sku B1",
+        "function": f"az functionapp create --name {params.resource_name} --resource-group {params.resource_group} --consumption-plan-location {params.location} --runtime python --runtime-version 3.11 --functions-version 4 --storage-account {params.resource_name}st",
+        "storage": f"az storage account create --name {params.resource_name} --resource-group {params.resource_group} --location {params.location} --sku Standard_LRS",
+        "cosmosdb": f"az cosmosdb create --name {params.resource_name} --resource-group {params.resource_group} --locations regionName={params.location} failoverPriority=0",
+        "container-app": f"az containerapp create --name {params.resource_name} --resource-group {params.resource_group} --environment {params.resource_name}-env --image mcr.microsoft.com/azuredocs/containerapps-helloworld:latest",
+        "aks": f"az aks create --name {params.resource_name} --resource-group {params.resource_group} --location {params.location} --node-count 1 --node-vm-size Standard_DS2_v2 --generate-ssh-keys",
+    }
+    
+    command = templates.get(
+        params.resource_type.lower(),
+        f"az {params.resource_type} create --name {params.resource_name} --resource-group {params.resource_group} --location {params.location}"
+    )
+    
+    return f"""## Azure CLI Command
+
+```bash
+# Create resource group (if needed)
+az group create --name {params.resource_group} --location {params.location}
+
+# Create {params.resource_type}
+{command}
+```
+
+### Cleanup Command
+```bash
+az group delete --name {params.resource_group} --yes --no-wait
+```
+
+⚠️ **Note**: Review and approve before executing these commands."""
+
+
+class ExecuteCommandParams(BaseModel):
+    """Parameters for executing an approved CLI command."""
+    command: str = Field(description="The Azure CLI command to execute")
+    approval_confirmed: bool = Field(description="Whether the user has explicitly approved this command")
+
+
+@define_tool(description="Execute an approved Azure CLI command (requires explicit approval)")
+async def execute_cli_command(params: ExecuteCommandParams) -> str:
+    """Execute an Azure CLI command after user approval."""
+    if not params.approval_confirmed:
+        return "❌ **Execution Blocked**: This command requires explicit user approval. Please confirm before proceeding."
+    
+    # In production, this would execute the command via subprocess
+    # For now, return a placeholder showing the command would be executed
+    return f"""✅ **Command Approved for Execution**
+
+```bash
+{params.command}
+```
+
+⏳ Execution would begin here in production mode.
+📊 Metrics would be collected and reported upon completion."""
+
+
+# =============================================================================
+# GHCPCodingAgent Class
+# =============================================================================
+
+class GHCPCodingAgent:
+    """
+    GHCP Coding Agent using GitHub Copilot SDK for intelligent code and CLI generation.
+    
+    Features:
+    - Copilot CLI runtime handles planning and tool invocation
+    - MCP servers for Azure best practices (Azure MCP, Microsoft Learn MCP)
+    - Custom tools via @define_tool decorator
+    - Streaming responses
+    
+    Prerequisites:
+    - Copilot CLI must be installed: https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli
+    - GitHub Copilot subscription required
+    - Install SDK: pip install github-copilot-sdk
+    """
+    
+    def __init__(self):
+        """Initialize GHCPCodingAgent."""
+        self._client: "CopilotClient | None" = None
+        self._session: "CopilotSession | None" = None
+        self._started = False
+        
+        if not COPILOT_SDK_AVAILABLE:
+            logger.warning(
+                "github-copilot-sdk not installed. "
+                "Install with: pip install github-copilot-sdk"
+            )
+    
+    async def start(self):
+        """Start the Copilot client and create a session."""
+        if not COPILOT_SDK_AVAILABLE:
+            raise RuntimeError(
+                "github-copilot-sdk is not installed. "
+                "Install with: pip install github-copilot-sdk"
+            )
+        
+        if self._started:
+            return
+        
+        logger.info("Starting Copilot client...")
+        
+        self._client = CopilotClient()
+        await self._client.start()
+        
+        # Create session with custom tools and MCP servers
+        self._session = await self._client.create_session({
+            "model": "gpt-4o",  # or "claude-sonnet-4", "gpt-5"
+            "streaming": True,
+            "tools": [create_test_plan, generate_cli_command, execute_cli_command],
+            "mcp_servers": {
+                # Azure MCP for best practices
+                "azure": MCPRemoteServerConfig(
+                    type="http",
+                    url=AZURE_MCP_URL,
+                    tools=["*"],  # All tools
+                ),
+                # Microsoft Learn MCP for documentation
+                "microsoft-learn": MCPRemoteServerConfig(
+                    type="http",
+                    url=MICROSOFT_LEARN_MCP_URL,
+                    tools=["*"],
+                ),
+            },
+            "system_message": {
+                "mode": "append",
+                "content": GHCP_CODING_INSTRUCTIONS,
+            },
+        })
+        
+        self._started = True
+        logger.info(
+            "GHCPCodingAgent session created",
+            mcp_servers=["azure", "microsoft-learn"],
+        )
+    
+    async def run(self, query: str) -> str:
+        """
+        Process a coding/validation query.
+        
+        Args:
+            query: User's request for code generation or hypothesis validation.
+            
+        Returns:
+            Generated response with code, CLI commands, or test plans.
+        """
+        if not self._started:
+            await self.start()
+        
+        if not self._session:
+            raise RuntimeError("Session not initialized")
+        
+        # Collect response
+        response_parts: list[str] = []
+        done = asyncio.Event()
+        
+        def on_event(event):
+            event_type = getattr(event.type, 'value', str(event.type))
+            if event_type == "assistant.message":
+                content = getattr(event.data, 'content', '')
+                if content:
+                    response_parts.append(content)
+            elif event_type == "assistant.message_delta":
+                # Handle streaming deltas
+                content = getattr(event.data, 'content', '')
+                if content:
+                    response_parts.append(content)
+            elif event_type == "session.idle":
+                done.set()
+        
+        self._session.on(on_event)
+        
+        try:
+            await self._session.send({"prompt": query})
+            await asyncio.wait_for(done.wait(), timeout=120.0)
+        except asyncio.TimeoutError:
+            logger.warning("Session response timed out after 120 seconds")
+        
+        return "".join(response_parts) if response_parts else "No response generated."
+    
+    async def close(self):
+        """Clean up resources."""
+        if self._session:
+            try:
+                await self._session.destroy()
+            except Exception as e:
+                logger.warning(f"Error destroying session: {e}")
+            self._session = None
+        
+        if self._client:
+            try:
+                await self._client.stop()
+            except Exception as e:
+                logger.warning(f"Error stopping client: {e}")
+            self._client = None
+        
+        self._started = False
+        logger.info("GHCPCodingAgent closed")
+    
+    async def __aenter__(self):
+        """Async context manager entry."""
+        await self.start()
+        return self
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit."""
+        await self.close()
+    
+    def as_tool(self):
+        """
+        Return agent as a tool for orchestration.
+        
+        Used by SolutionEngineerAgent to delegate coding queries.
+        Note: For Copilot SDK agents, we wrap the run() method.
+        """
+        agent = self
+        
+        @ai_function
+        async def code(
+            query: Annotated[str, "Code generation, CLI command, or hypothesis validation query"]
+        ) -> str:
+            """Generate code, Azure CLI commands, and validate hypotheses through test deployments."""
+            return await agent.run(query)
+        
+        return code
+
+
+# =============================================================================
+# Factory Function
+# =============================================================================
+
+def get_ghcp_coding_agent() -> GHCPCodingAgent:
+    """Get a GHCPCodingAgent instance."""
+    return GHCPCodingAgent()
