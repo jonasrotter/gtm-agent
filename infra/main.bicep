@@ -33,7 +33,7 @@ param appServicePlanSku string = 'B1'
 param azureOpenAiEndpoint string
 
 @description('Azure OpenAI deployment name')
-param azureOpenAiDeployment string = 'gpt-4o'
+param azureOpenAiDeployment string = 'gpt-5.2'
 
 @description('Azure OpenAI API version')
 param azureOpenAiApiVersion string = '2024-02-15-preview'
@@ -45,6 +45,27 @@ param apiKey string = ''
 @description('Log level (DEBUG, INFO, WARNING, ERROR)')
 @allowed(['DEBUG', 'INFO', 'WARNING', 'ERROR'])
 param logLevel string = 'INFO'
+
+// GitHub Copilot SDK Configuration (BYOK mode)
+@description('Enable Copilot CLI for SDK code tool (requires Node.js on App Service)')
+param copilotCliEnabled bool = false
+
+@description('Copilot CLI server port (used internally)')
+param copilotCliPort int = 4321
+
+@description('Use Azure OpenAI as the LLM provider for Copilot SDK (BYOK mode)')
+param copilotUseAzureOpenAi bool = true
+
+@description('Azure OpenAI endpoint for Copilot SDK BYOK mode')
+@secure()
+param copilotAzureOpenAiEndpoint string = ''
+
+@description('Azure OpenAI API key for Copilot SDK BYOK mode')
+@secure()
+param copilotAzureOpenAiApiKey string = ''
+
+@description('Model name for Copilot SDK')
+param copilotModel string = 'gpt-5.2'
 
 // =============================================================================
 // Variables
@@ -86,6 +107,13 @@ module appService 'modules/appservice.bicep' = {
     azureOpenAiApiVersion: azureOpenAiApiVersion
     apiKey: apiKey
     logLevel: logLevel
+    // Copilot SDK configuration
+    copilotCliEnabled: copilotCliEnabled
+    copilotCliPort: copilotCliPort
+    copilotUseAzureOpenAi: copilotUseAzureOpenAi
+    copilotAzureOpenAiEndpoint: copilotAzureOpenAiEndpoint
+    copilotAzureOpenAiApiKey: copilotAzureOpenAiApiKey
+    copilotModel: copilotModel
   }
 }
 

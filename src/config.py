@@ -108,6 +108,33 @@ class Settings(BaseSettings):
         description="Timeout for MCP tool calls in seconds",
     )
 
+    # GitHub Copilot SDK Configuration
+    copilot_cli_url: str = Field(
+        default="",
+        description="External Copilot CLI server URL (e.g., 'localhost:4321'). "
+        "If empty, SDK will auto-spawn the CLI process locally.",
+    )
+    copilot_use_azure_openai: bool = Field(
+        default=False,
+        description="Use Azure OpenAI as the LLM provider (BYOK mode) instead of GitHub Copilot.",
+    )
+    copilot_model: str = Field(
+        default="gpt-4o",
+        description="Model to use for Copilot sessions.",
+    )
+    copilot_azure_openai_endpoint: str = Field(
+        default="",
+        description="Azure OpenAI endpoint URL for BYOK mode.",
+    )
+    copilot_azure_openai_api_key: str = Field(
+        default="",
+        description="Azure OpenAI API key for BYOK mode.",
+    )
+    copilot_azure_openai_api_version: str = Field(
+        default="2024-10-21",
+        description="Azure OpenAI API version for BYOK mode.",
+    )
+
     @field_validator("log_level", mode="before")
     @classmethod
     def uppercase_log_level(cls, v: str) -> str:
@@ -123,6 +150,20 @@ class Settings(BaseSettings):
     def has_azure_config(self) -> bool:
         """Check if Azure configuration is available for hypothesis validation."""
         return bool(self.azure_subscription_id)
+
+    @property
+    def copilot_has_azure_byok_config(self) -> bool:
+        """Check if Azure OpenAI BYOK configuration is complete for Copilot SDK."""
+        return (
+            self.copilot_use_azure_openai
+            and bool(self.copilot_azure_openai_endpoint)
+            and bool(self.copilot_azure_openai_api_key)
+        )
+
+    @property
+    def copilot_has_external_cli(self) -> bool:
+        """Check if an external Copilot CLI server URL is configured."""
+        return bool(self.copilot_cli_url)
 
 
 @lru_cache

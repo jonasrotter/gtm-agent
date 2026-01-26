@@ -48,6 +48,34 @@ param apiKey string
 @description('Log level')
 param logLevel string
 
+// GitHub Copilot SDK Configuration
+@description('Enable Copilot CLI for SDK code tool')
+param copilotCliEnabled bool = false
+
+@description('Copilot CLI server port')
+param copilotCliPort int = 4321
+
+@description('Use Azure OpenAI for Copilot SDK (BYOK mode)')
+param copilotUseAzureOpenAi bool = true
+
+@description('Azure OpenAI endpoint for Copilot SDK')
+@secure()
+param copilotAzureOpenAiEndpoint string = ''
+
+@description('Azure OpenAI API key for Copilot SDK')
+@secure()
+param copilotAzureOpenAiApiKey string = ''
+
+@description('Model name for Copilot SDK')
+param copilotModel string = 'gpt-4o'
+
+// =============================================================================
+// Variables
+// =============================================================================
+
+// Build Copilot CLI URL only if enabled
+var copilotCliUrl = copilotCliEnabled ? 'localhost:${copilotCliPort}' : ''
+
 // =============================================================================
 // Resources
 // =============================================================================
@@ -87,8 +115,8 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
       minTlsVersion: '1.2'
       http20Enabled: true
       // Startup command for FastAPI with Gunicorn
-      // Uses app.py entry point which properly sets up PYTHONPATH for Oryx extraction
-      appCommandLine: 'gunicorn app:app --workers 2 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --timeout 300'
+      // Note: Copilot SDK code tool requires local Copilot CLI - not available in Azure App Service
+      appCommandLine: 'gunicorn src.api:app --workers 2 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --timeout 300'
       // App settings
       appSettings: [
         // Application Configuration
@@ -144,6 +172,31 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
         {
           name: 'WEBSITE_HTTPLOGGING_RETENTION_DAYS'
           value: '7'
+        }
+        // GitHub Copilot SDK Configuration
+        {
+          name: 'COPILOT_CLI_URL'
+          value: copilotCliUrl
+        }
+        {
+          name: 'COPILOT_USE_AZURE_OPENAI'
+          value: string(copilotUseAzureOpenAi)
+        }
+        {
+          name: 'COPILOT_MODEL'
+          value: copilotModel
+        }
+        {
+          name: 'COPILOT_AZURE_OPENAI_ENDPOINT'
+          value: copilotAzureOpenAiEndpoint
+        }
+        {
+          name: 'COPILOT_AZURE_OPENAI_API_KEY'
+          value: copilotAzureOpenAiApiKey
+        }
+        {
+          name: 'COPILOT_AZURE_OPENAI_API_VERSION'
+          value: '2024-10-21'
         }
       ]
     }

@@ -25,6 +25,24 @@
     },
     "logLevel": {
       "value": "INFO"
+    },
+    "copilotCliEnabled": {
+      "value": true
+    },
+    "copilotCliPort": {
+      "value": 4321
+    },
+    "copilotUseAzureOpenAi": {
+      "value": true
+    },
+    "copilotAzureOpenAiEndpoint": {
+      "value": ""
+    },
+    "copilotAzureOpenAiApiKey": {
+      "value": ""
+    },
+    "copilotModel": {
+      "value": "gpt-4o"
     }
   }
 }

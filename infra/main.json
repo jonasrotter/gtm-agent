@@ -1,0 +1,708 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.39.26.7824",
+      "templateHash": "15701598696638021920"
+    }
+  },
+  "parameters": {
+    "appName": {
+      "type": "string",
+      "defaultValue": "gtm-agent",
+      "metadata": {
+        "description": "Base name for all resources"
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Azure region for resources"
+      }
+    },
+    "environment": {
+      "type": "string",
+      "defaultValue": "dev",
+      "allowedValues": [
+        "dev",
+        "staging",
+        "prod"
+      ],
+      "metadata": {
+        "description": "Environment (dev, staging, prod)"
+      }
+    },
+    "appServicePlanSku": {
+      "type": "string",
+      "defaultValue": "B1",
+      "allowedValues": [
+        "B1",
+        "B2",
+        "B3",
+        "P1V3",
+        "P2V3",
+        "P3V3"
+      ],
+      "metadata": {
+        "description": "App Service Plan SKU"
+      }
+    },
+    "azureOpenAiEndpoint": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Azure OpenAI endpoint URL"
+      }
+    },
+    "azureOpenAiDeployment": {
+      "type": "string",
+      "defaultValue": "gpt-4o",
+      "metadata": {
+        "description": "Azure OpenAI deployment name"
+      }
+    },
+    "azureOpenAiApiVersion": {
+      "type": "string",
+      "defaultValue": "2024-02-15-preview",
+      "metadata": {
+        "description": "Azure OpenAI API version"
+      }
+    },
+    "apiKey": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Optional API key for authentication"
+      }
+    },
+    "logLevel": {
+      "type": "string",
+      "defaultValue": "INFO",
+      "allowedValues": [
+        "DEBUG",
+        "INFO",
+        "WARNING",
+        "ERROR"
+      ],
+      "metadata": {
+        "description": "Log level (DEBUG, INFO, WARNING, ERROR)"
+      }
+    },
+    "copilotCliEnabled": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Enable Copilot CLI for SDK code tool (requires Node.js on App Service)"
+      }
+    },
+    "copilotCliPort": {
+      "type": "int",
+      "defaultValue": 4321,
+      "metadata": {
+        "description": "Copilot CLI server port (used internally)"
+      }
+    },
+    "copilotUseAzureOpenAi": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Use Azure OpenAI as the LLM provider for Copilot SDK (BYOK mode)"
+      }
+    },
+    "copilotAzureOpenAiEndpoint": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Azure OpenAI endpoint for Copilot SDK BYOK mode"
+      }
+    },
+    "copilotAzureOpenAiApiKey": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Azure OpenAI API key for Copilot SDK BYOK mode"
+      }
+    },
+    "copilotModel": {
+      "type": "string",
+      "defaultValue": "gpt-4o",
+      "metadata": {
+        "description": "Model name for Copilot SDK"
+      }
+    }
+  },
+  "variables": {
+    "resourcePrefix": "[format('{0}-{1}', parameters('appName'), parameters('environment'))]",
+    "tags": {
+      "Application": "[parameters('appName')]",
+      "Environment": "[parameters('environment')]",
+      "ManagedBy": "Bicep"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "monitoring-deployment",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "resourcePrefix": {
+            "value": "[variables('resourcePrefix')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[variables('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.39.26.7824",
+              "templateHash": "7621509324472186603"
+            }
+          },
+          "parameters": {
+            "resourcePrefix": {
+              "type": "string",
+              "metadata": {
+                "description": "Resource name prefix"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "metadata": {
+                "description": "Resource tags"
+              }
+            },
+            "logRetentionDays": {
+              "type": "int",
+              "defaultValue": 30,
+              "minValue": 30,
+              "maxValue": 730,
+              "metadata": {
+                "description": "Log Analytics retention in days"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.OperationalInsights/workspaces",
+              "apiVersion": "2023-09-01",
+              "name": "[format('{0}-logs', parameters('resourcePrefix'))]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "sku": {
+                  "name": "PerGB2018"
+                },
+                "retentionInDays": "[parameters('logRetentionDays')]",
+                "features": {
+                  "enableLogAccessUsingOnlyResourcePermissions": true
+                },
+                "workspaceCapping": {
+                  "dailyQuotaGb": 1
+                }
+              }
+            },
+            {
+              "type": "Microsoft.Insights/components",
+              "apiVersion": "2020-02-02",
+              "name": "[format('{0}-insights', parameters('resourcePrefix'))]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "kind": "web",
+              "properties": {
+                "Application_Type": "web",
+                "WorkspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', format('{0}-logs', parameters('resourcePrefix')))]",
+                "IngestionMode": "LogAnalytics",
+                "publicNetworkAccessForIngestion": "Enabled",
+                "publicNetworkAccessForQuery": "Enabled",
+                "RetentionInDays": "[parameters('logRetentionDays')]"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.OperationalInsights/workspaces', format('{0}-logs', parameters('resourcePrefix')))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "applicationInsightsConnectionString": {
+              "type": "string",
+              "metadata": {
+                "description": "Application Insights connection string"
+              },
+              "value": "[reference(resourceId('Microsoft.Insights/components', format('{0}-insights', parameters('resourcePrefix'))), '2020-02-02').ConnectionString]"
+            },
+            "applicationInsightsInstrumentationKey": {
+              "type": "string",
+              "metadata": {
+                "description": "Application Insights instrumentation key"
+              },
+              "value": "[reference(resourceId('Microsoft.Insights/components', format('{0}-insights', parameters('resourcePrefix'))), '2020-02-02').InstrumentationKey]"
+            },
+            "applicationInsightsName": {
+              "type": "string",
+              "metadata": {
+                "description": "Application Insights name"
+              },
+              "value": "[format('{0}-insights', parameters('resourcePrefix'))]"
+            },
+            "applicationInsightsResourceId": {
+              "type": "string",
+              "metadata": {
+                "description": "Application Insights resource ID"
+              },
+              "value": "[resourceId('Microsoft.Insights/components', format('{0}-insights', parameters('resourcePrefix')))]"
+            },
+            "logAnalyticsWorkspaceId": {
+              "type": "string",
+              "metadata": {
+                "description": "Log Analytics Workspace ID"
+              },
+              "value": "[resourceId('Microsoft.OperationalInsights/workspaces', format('{0}-logs', parameters('resourcePrefix')))]"
+            },
+            "logAnalyticsWorkspaceName": {
+              "type": "string",
+              "metadata": {
+                "description": "Log Analytics Workspace name"
+              },
+              "value": "[format('{0}-logs', parameters('resourcePrefix'))]"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "appservice-deployment",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "resourcePrefix": {
+            "value": "[variables('resourcePrefix')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[variables('tags')]"
+          },
+          "appServicePlanSku": {
+            "value": "[parameters('appServicePlanSku')]"
+          },
+          "applicationInsightsConnectionString": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'monitoring-deployment'), '2025-04-01').outputs.applicationInsightsConnectionString.value]"
+          },
+          "applicationInsightsInstrumentationKey": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'monitoring-deployment'), '2025-04-01').outputs.applicationInsightsInstrumentationKey.value]"
+          },
+          "azureOpenAiEndpoint": {
+            "value": "[parameters('azureOpenAiEndpoint')]"
+          },
+          "azureOpenAiDeployment": {
+            "value": "[parameters('azureOpenAiDeployment')]"
+          },
+          "azureOpenAiApiVersion": {
+            "value": "[parameters('azureOpenAiApiVersion')]"
+          },
+          "apiKey": {
+            "value": "[parameters('apiKey')]"
+          },
+          "logLevel": {
+            "value": "[parameters('logLevel')]"
+          },
+          "copilotCliEnabled": {
+            "value": "[parameters('copilotCliEnabled')]"
+          },
+          "copilotCliPort": {
+            "value": "[parameters('copilotCliPort')]"
+          },
+          "copilotUseAzureOpenAi": {
+            "value": "[parameters('copilotUseAzureOpenAi')]"
+          },
+          "copilotAzureOpenAiEndpoint": {
+            "value": "[parameters('copilotAzureOpenAiEndpoint')]"
+          },
+          "copilotAzureOpenAiApiKey": {
+            "value": "[parameters('copilotAzureOpenAiApiKey')]"
+          },
+          "copilotModel": {
+            "value": "[parameters('copilotModel')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.39.26.7824",
+              "templateHash": "10933192164165037576"
+            }
+          },
+          "parameters": {
+            "resourcePrefix": {
+              "type": "string",
+              "metadata": {
+                "description": "Resource name prefix"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "metadata": {
+                "description": "Resource tags"
+              }
+            },
+            "appServicePlanSku": {
+              "type": "string",
+              "metadata": {
+                "description": "App Service Plan SKU"
+              }
+            },
+            "applicationInsightsConnectionString": {
+              "type": "securestring",
+              "metadata": {
+                "description": "Application Insights connection string"
+              }
+            },
+            "applicationInsightsInstrumentationKey": {
+              "type": "securestring",
+              "metadata": {
+                "description": "Application Insights instrumentation key"
+              }
+            },
+            "azureOpenAiEndpoint": {
+              "type": "securestring",
+              "metadata": {
+                "description": "Azure OpenAI endpoint"
+              }
+            },
+            "azureOpenAiDeployment": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure OpenAI deployment name"
+              }
+            },
+            "azureOpenAiApiVersion": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure OpenAI API version"
+              }
+            },
+            "apiKey": {
+              "type": "securestring",
+              "metadata": {
+                "description": "API key for authentication"
+              }
+            },
+            "logLevel": {
+              "type": "string",
+              "metadata": {
+                "description": "Log level"
+              }
+            },
+            "copilotCliEnabled": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Enable Copilot CLI for SDK code tool"
+              }
+            },
+            "copilotCliPort": {
+              "type": "int",
+              "defaultValue": 4321,
+              "metadata": {
+                "description": "Copilot CLI server port"
+              }
+            },
+            "copilotUseAzureOpenAi": {
+              "type": "bool",
+              "defaultValue": true,
+              "metadata": {
+                "description": "Use Azure OpenAI for Copilot SDK (BYOK mode)"
+              }
+            },
+            "copilotAzureOpenAiEndpoint": {
+              "type": "securestring",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Azure OpenAI endpoint for Copilot SDK"
+              }
+            },
+            "copilotAzureOpenAiApiKey": {
+              "type": "securestring",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Azure OpenAI API key for Copilot SDK"
+              }
+            },
+            "copilotModel": {
+              "type": "string",
+              "defaultValue": "gpt-4o",
+              "metadata": {
+                "description": "Model name for Copilot SDK"
+              }
+            }
+          },
+          "variables": {
+            "copilotCliUrl": "[if(parameters('copilotCliEnabled'), format('localhost:{0}', parameters('copilotCliPort')), '')]"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Web/serverfarms",
+              "apiVersion": "2023-12-01",
+              "name": "[format('{0}-plan', parameters('resourcePrefix'))]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "kind": "linux",
+              "sku": {
+                "name": "[parameters('appServicePlanSku')]"
+              },
+              "properties": {
+                "reserved": true
+              }
+            },
+            {
+              "type": "Microsoft.Web/sites",
+              "apiVersion": "2023-12-01",
+              "name": "[format('{0}-app', parameters('resourcePrefix'))]",
+              "location": "[parameters('location')]",
+              "tags": "[union(parameters('tags'), createObject('azd-service-name', 'web'))]",
+              "kind": "app,linux",
+              "identity": {
+                "type": "SystemAssigned"
+              },
+              "properties": {
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', format('{0}-plan', parameters('resourcePrefix')))]",
+                "httpsOnly": true,
+                "siteConfig": {
+                  "linuxFxVersion": "PYTHON|3.11",
+                  "alwaysOn": true,
+                  "ftpsState": "Disabled",
+                  "minTlsVersion": "1.2",
+                  "http20Enabled": true,
+                  "appCommandLine": "bash startup.sh",
+                  "appSettings": [
+                    {
+                      "name": "SCM_DO_BUILD_DURING_DEPLOYMENT",
+                      "value": "true"
+                    },
+                    {
+                      "name": "ENABLE_ORYX_BUILD",
+                      "value": "true"
+                    },
+                    {
+                      "name": "AZURE_OPENAI_ENDPOINT",
+                      "value": "[parameters('azureOpenAiEndpoint')]"
+                    },
+                    {
+                      "name": "AZURE_OPENAI_DEPLOYMENT",
+                      "value": "[parameters('azureOpenAiDeployment')]"
+                    },
+                    {
+                      "name": "AZURE_OPENAI_API_VERSION",
+                      "value": "[parameters('azureOpenAiApiVersion')]"
+                    },
+                    {
+                      "name": "API_KEY",
+                      "value": "[parameters('apiKey')]"
+                    },
+                    {
+                      "name": "LOG_LEVEL",
+                      "value": "[parameters('logLevel')]"
+                    },
+                    {
+                      "name": "LOG_FORMAT",
+                      "value": "json"
+                    },
+                    {
+                      "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",
+                      "value": "[parameters('applicationInsightsConnectionString')]"
+                    },
+                    {
+                      "name": "APPINSIGHTS_INSTRUMENTATIONKEY",
+                      "value": "[parameters('applicationInsightsInstrumentationKey')]"
+                    },
+                    {
+                      "name": "PYTHONUNBUFFERED",
+                      "value": "1"
+                    },
+                    {
+                      "name": "WEBSITE_HTTPLOGGING_RETENTION_DAYS",
+                      "value": "7"
+                    },
+                    {
+                      "name": "COPILOT_CLI_URL",
+                      "value": "[variables('copilotCliUrl')]"
+                    },
+                    {
+                      "name": "COPILOT_USE_AZURE_OPENAI",
+                      "value": "[string(parameters('copilotUseAzureOpenAi'))]"
+                    },
+                    {
+                      "name": "COPILOT_MODEL",
+                      "value": "[parameters('copilotModel')]"
+                    },
+                    {
+                      "name": "COPILOT_AZURE_OPENAI_ENDPOINT",
+                      "value": "[parameters('copilotAzureOpenAiEndpoint')]"
+                    },
+                    {
+                      "name": "COPILOT_AZURE_OPENAI_API_KEY",
+                      "value": "[parameters('copilotAzureOpenAiApiKey')]"
+                    },
+                    {
+                      "name": "COPILOT_AZURE_OPENAI_API_VERSION",
+                      "value": "2024-10-21"
+                    }
+                  ]
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', format('{0}-plan', parameters('resourcePrefix')))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Web/sites/config",
+              "apiVersion": "2023-12-01",
+              "name": "[format('{0}/{1}', format('{0}-app', parameters('resourcePrefix')), 'logs')]",
+              "properties": {
+                "httpLogs": {
+                  "fileSystem": {
+                    "enabled": true,
+                    "retentionInDays": 7,
+                    "retentionInMb": 35
+                  }
+                },
+                "applicationLogs": {
+                  "fileSystem": {
+                    "level": "Information"
+                  }
+                },
+                "detailedErrorMessages": {
+                  "enabled": true
+                },
+                "failedRequestsTracing": {
+                  "enabled": true
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', format('{0}-app', parameters('resourcePrefix')))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "webAppUrl": {
+              "type": "string",
+              "metadata": {
+                "description": "Web App URL"
+              },
+              "value": "[format('https://{0}', reference(resourceId('Microsoft.Web/sites', format('{0}-app', parameters('resourcePrefix'))), '2023-12-01').defaultHostName)]"
+            },
+            "webAppName": {
+              "type": "string",
+              "metadata": {
+                "description": "Web App name"
+              },
+              "value": "[format('{0}-app', parameters('resourcePrefix'))]"
+            },
+            "webAppResourceId": {
+              "type": "string",
+              "metadata": {
+                "description": "Web App resource ID"
+              },
+              "value": "[resourceId('Microsoft.Web/sites', format('{0}-app', parameters('resourcePrefix')))]"
+            },
+            "webAppPrincipalId": {
+              "type": "string",
+              "metadata": {
+                "description": "Web App principal ID (managed identity)"
+              },
+              "value": "[reference(resourceId('Microsoft.Web/sites', format('{0}-app', parameters('resourcePrefix'))), '2023-12-01', 'full').identity.principalId]"
+            },
+            "appServicePlanName": {
+              "type": "string",
+              "metadata": {
+                "description": "App Service Plan name"
+              },
+              "value": "[format('{0}-plan', parameters('resourcePrefix'))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'monitoring-deployment')]"
+      ]
+    }
+  ],
+  "outputs": {
+    "webAppUrl": {
+      "type": "string",
+      "metadata": {
+        "description": "Web App URL"
+      },
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', 'appservice-deployment'), '2025-04-01').outputs.webAppUrl.value]"
+    },
+    "webAppName": {
+      "type": "string",
+      "metadata": {
+        "description": "Web App name"
+      },
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', 'appservice-deployment'), '2025-04-01').outputs.webAppName.value]"
+    },
+    "mcpServerEndpoint": {
+      "type": "string",
+      "metadata": {
+        "description": "MCP Server endpoint"
+      },
+      "value": "[format('{0}/mcp/mcp', reference(resourceId('Microsoft.Resources/deployments', 'appservice-deployment'), '2025-04-01').outputs.webAppUrl.value)]"
+    },
+    "healthEndpoint": {
+      "type": "string",
+      "metadata": {
+        "description": "Health check endpoint"
+      },
+      "value": "[format('{0}/health', reference(resourceId('Microsoft.Resources/deployments', 'appservice-deployment'), '2025-04-01').outputs.webAppUrl.value)]"
+    },
+    "applicationInsightsName": {
+      "type": "string",
+      "metadata": {
+        "description": "Application Insights name"
+      },
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', 'monitoring-deployment'), '2025-04-01').outputs.applicationInsightsName.value]"
+    },
+    "logAnalyticsWorkspaceId": {
+      "type": "string",
+      "metadata": {
+        "description": "Log Analytics Workspace ID"
+      },
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', 'monitoring-deployment'), '2025-04-01').outputs.logAnalyticsWorkspaceId.value]"
+    }
+  }
+}

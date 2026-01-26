@@ -3,6 +3,10 @@ GHCP Coding Agent using GitHub Copilot SDK for code generation and hypothesis va
 
 This agent uses the github-copilot-sdk to leverage Copilot's agentic runtime
 with built-in MCP server support for intelligent code and CLI generation.
+
+Supports two deployment modes:
+1. Local Development: Auto-spawns Copilot CLI (requires GitHub Copilot subscription)
+2. Azure Production: BYOK with Azure OpenAI (no GitHub auth required)
 """
 
 import asyncio
@@ -11,6 +15,7 @@ from typing import Annotated
 from pydantic import BaseModel, Field
 
 from src.agents.base import AZURE_MCP_URL, MICROSOFT_LEARN_MCP_URL
+from src.config import get_settings
 from src.lib.logging import get_logger
 
 # GitHub Copilot SDK imports
@@ -185,24 +190,57 @@ class GHCPCodingAgent:
     - Custom tools via @define_tool decorator
     - Streaming responses
     
+    Deployment Modes:
+    1. Local Development (default):
+       - Auto-spawns Copilot CLI process
+       - Requires GitHub Copilot subscription
+       - Set: COPILOT_USE_AZURE_OPENAI=false (default)
+    
+    2. Azure Production (BYOK):
+       - Uses Azure OpenAI as LLM provider
+       - No GitHub authentication required
+       - Set: COPILOT_USE_AZURE_OPENAI=true
+       - Requires: COPILOT_AZURE_OPENAI_ENDPOINT, COPILOT_AZURE_OPENAI_API_KEY
+    
+    3. External CLI Server:
+       - Connects to pre-running Copilot CLI server
+       - Set: COPILOT_CLI_URL=localhost:4321
+
     Prerequisites:
-    - Copilot CLI must be installed: https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli
-    - GitHub Copilot subscription required
+    - Copilot CLI must be installed: npm install -g @github/copilot
     - Install SDK: pip install github-copilot-sdk
     """
     
     def __init__(self):
-        """Initialize GHCPCodingAgent."""
+        """Initialize GHCPCodingAgent with configuration from settings."""
         self._client: "CopilotClient | None" = None
         self._session: "CopilotSession | None" = None
         self._started = False
+        
+        # Load configuration
+        self._settings = get_settings()
         
         if not COPILOT_SDK_AVAILABLE:
             logger.warning(
                 "github-copilot-sdk not installed. "
                 "Install with: pip install github-copilot-sdk"
             )
-    
+        
+        # Log deployment mode
+        if self._settings.copilot_use_azure_openai:
+            logger.info(
+                "GHCPCodingAgent configured for Azure OpenAI BYOK mode",
+                endpoint=self._settings.copilot_azure_openai_endpoint[:50] + "..." 
+                if self._settings.copilot_azure_openai_endpoint else "NOT SET",
+            )
+        elif self._settings.copilot_cli_url:
+            logger.info(
+                "GHCPCodingAgent configured for external CLI server",
+                cli_url=self._settings.copilot_cli_url,
+            )
+        else:
+            logger.info("GHCPCodingAgent configured for local CLI (auto-spawn)")
+
     async def start(self):
         """Start the Copilot client and create a session."""
         if not COPILOT_SDK_AVAILABLE:
@@ -213,15 +251,37 @@ class GHCPCodingAgent:
         
         if self._started:
             return
-        
+
         logger.info("Starting Copilot client...")
-        
-        self._client = CopilotClient()
-        await self._client.start()
-        
-        # Create session with custom tools and MCP servers
-        self._session = await self._client.create_session({
-            "model": "gpt-4o",  # or "claude-sonnet-4", "gpt-5"
+
+        # Build client options based on configuration
+        client_options = {}
+        if self._settings.copilot_cli_url:
+            client_options["cli_url"] = self._settings.copilot_cli_url
+            logger.info(
+                "Connecting to external CLI server",
+                cli_url=self._settings.copilot_cli_url,
+            )
+
+        try:
+            self._client = CopilotClient(client_options) if client_options else CopilotClient()
+            await self._client.start()
+        except FileNotFoundError as e:
+            raise RuntimeError(
+                "Copilot CLI not found. Please install it with: npm install -g @github/copilot\n"
+                f"Original error: {e}"
+            ) from e
+        except Exception as e:
+            if "WinError 2" in str(e) or "No such file" in str(e):
+                raise RuntimeError(
+                    "Copilot CLI not found. Please install it with: npm install -g @github/copilot\n"
+                    f"Original error: {e}"
+                ) from e
+            raise
+
+        # Build session configuration
+        session_config = {
+            "model": self._settings.copilot_model,
             "streaming": True,
             "tools": [create_test_plan, generate_cli_command, execute_cli_command],
             "mcp_servers": {
@@ -242,21 +302,48 @@ class GHCPCodingAgent:
                 "mode": "append",
                 "content": GHCP_CODING_INSTRUCTIONS,
             },
-        })
+        }
+
+        # Add Azure OpenAI provider configuration if BYOK mode is enabled
+        if self._settings.copilot_use_azure_openai:
+            if not self._settings.copilot_has_azure_byok_config:
+                raise RuntimeError(
+                    "Azure OpenAI BYOK mode is enabled but configuration is incomplete. "
+                    "Please set COPILOT_AZURE_OPENAI_ENDPOINT and COPILOT_AZURE_OPENAI_API_KEY."
+                )
+            
+            session_config["provider"] = {
+                "type": "azure",
+                "base_url": self._settings.copilot_azure_openai_endpoint,
+                "api_key": self._settings.copilot_azure_openai_api_key,
+                "azure": {
+                    "api_version": self._settings.copilot_azure_openai_api_version,
+                },
+            }
+            logger.info(
+                "Using Azure OpenAI BYOK provider",
+                endpoint=self._settings.copilot_azure_openai_endpoint[:50] + "...",
+                model=self._settings.copilot_model,
+            )
+
+        # Create session with custom tools and MCP servers
+        self._session = await self._client.create_session(session_config)
         
         self._started = True
         logger.info(
             "GHCPCodingAgent session created",
             mcp_servers=["azure", "microsoft-learn"],
+            model=self._settings.copilot_model,
+            byok_mode=self._settings.copilot_use_azure_openai,
         )
-    
+
     async def run(self, query: str) -> str:
         """
         Process a coding/validation query.
-        
+
         Args:
             query: User's request for code generation or hypothesis validation.
-            
+
         Returns:
             Generated response with code, CLI commands, or test plans.
         """

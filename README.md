@@ -460,6 +460,41 @@ Deploy the GTM Agent to Azure App Service for production use. The deployment inc
 - Azure OpenAI resource with GPT-4o deployment
 - Python 3.11+ installed locally (for creating deployment packages)
 
+### GitHub Copilot SDK Deployment Modes
+
+The `GHCPCodingAgent` (code generation tool) supports multiple deployment modes:
+
+| Mode | Use Case | Configuration |
+|------|----------|---------------|
+| **Local Development** | Running locally with GitHub Copilot subscription | Default (no config needed) |
+| **External CLI Server** | Connect to a pre-running Copilot CLI | `COPILOT_CLI_URL=localhost:4321` |
+| **Azure BYOK** | Production on Azure using Azure OpenAI | See below |
+
+#### Azure BYOK Mode (Recommended for Production)
+
+For production deployments on Azure, use **BYOK (Bring Your Own Key)** mode with Azure OpenAI:
+
+```bash
+# Required environment variables for Azure BYOK mode
+COPILOT_CLI_URL=localhost:4321           # External CLI server URL
+COPILOT_USE_AZURE_OPENAI=true            # Enable Azure OpenAI as LLM provider
+COPILOT_AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
+COPILOT_AZURE_OPENAI_API_KEY=your-api-key
+COPILOT_MODEL=gpt-4o                     # Your deployment name
+COPILOT_AZURE_OPENAI_API_VERSION=2024-10-21
+```
+
+**Benefits of BYOK mode:**
+- ✅ No GitHub Copilot authentication required on server
+- ✅ Use your own Azure OpenAI quota and billing
+- ✅ Full control over model selection and configuration
+- ✅ Enterprise-grade security with Azure credentials
+
+The `startup.sh` script automatically:
+1. Installs the Copilot CLI (`npm install -g @github/copilot`)
+2. Starts the CLI in server mode on the configured port
+3. Configures the SDK to use Azure OpenAI as the LLM provider
+
 ### Important: ZIP Package Format
 
 When deploying from Windows, the deployment scripts use Python to create ZIP files with Unix-style path separators (forward slashes). This is required because Azure App Service runs on Linux and expects Unix paths in the archive.
@@ -516,6 +551,21 @@ For automated deployments, configure GitHub Actions:
 | `infra/parameters.json` | Default parameter values |
 | `app.py` | Entry point that sets up PYTHONPATH for Oryx |
 | `gunicorn.conf.py` | Gunicorn configuration |
+
+### Copilot SDK Bicep Parameters
+
+The following parameters in `infra/parameters.json` configure the GitHub Copilot SDK:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `copilotCliEnabled` | bool | `true` | Enable Copilot CLI in startup script |
+| `copilotCliPort` | int | `4321` | Port for Copilot CLI server |
+| `copilotUseAzureOpenAi` | bool | `true` | Use Azure OpenAI as LLM provider (BYOK) |
+| `copilotModel` | string | `gpt-4o` | Model/deployment name |
+| `copilotAzureOpenAiEndpoint` | string | `""` | Azure OpenAI endpoint URL |
+| `copilotAzureOpenAiApiKey` | string | `""` | Azure OpenAI API key (use Key Vault in prod) |
+
+**Note:** For production, store sensitive values like `copilotAzureOpenAiApiKey` in Azure Key Vault and reference them securely.
 
 ### Deployment Architecture
 
