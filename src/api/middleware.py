@@ -11,6 +11,7 @@ from collections.abc import Callable
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from src.lib.logging import bind_request_context, clear_request_context, get_logger
 
@@ -116,3 +117,10 @@ def setup_middleware(app: FastAPI) -> None:
     # Add middleware in reverse order (last added = first executed)
     app.add_middleware(RequestLoggingMiddleware)
     app.add_middleware(ErrorHandlerMiddleware)
+    
+    # Allow all hosts to support Azure App Service and MCP SSE connections
+    # Azure App Service can reject requests with 421 "Invalid Host header" otherwise
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=["*"],
+    )

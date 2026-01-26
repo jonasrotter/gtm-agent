@@ -1,0 +1,30 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "appName": {
+      "value": "gtm-agent"
+    },
+    "environment": {
+      "value": "dev"
+    },
+    "appServicePlanSku": {
+      "value": "B1"
+    },
+    "azureOpenAiEndpoint": {
+      "value": ""
+    },
+    "azureOpenAiDeployment": {
+      "value": "gpt-4o"
+    },
+    "azureOpenAiApiVersion": {
+      "value": "2024-02-15-preview"
+    },
+    "apiKey": {
+      "value": ""
+    },
+    "logLevel": {
+      "value": "INFO"
+    }
+  }
+}

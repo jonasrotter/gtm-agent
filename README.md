@@ -445,6 +445,102 @@ This project uses two key frameworks:
 - **Type-safe custom tools**: `@define_tool` with Pydantic models for GitHub Copilot SDK
 - **SC-007**: Non-Azure query rejection with helpful messaging
 
+## Azure Deployment
+
+Deploy the GTM Agent to Azure App Service for production use. The deployment includes:
+- **Azure App Service** (Linux, Python 3.11)
+- **Application Insights** for monitoring
+- **Log Analytics** for centralized logging
+- **Managed Identity** for secure authentication
+
+### Prerequisites
+
+- Azure CLI installed and logged in (`az login`)
+- Azure subscription with Contributor access
+- Azure OpenAI resource with GPT-4o deployment
+- Python 3.11+ installed locally (for creating deployment packages)
+
+### Important: ZIP Package Format
+
+When deploying from Windows, the deployment scripts use Python to create ZIP files with Unix-style path separators (forward slashes). This is required because Azure App Service runs on Linux and expects Unix paths in the archive.
+
+### Quick Deploy (PowerShell)
+
+```powershell
+# Deploy to development environment
+.\scripts\deploy.ps1 -AzureOpenAiEndpoint "https://your-openai.openai.azure.com"
+
+# Deploy to production with higher SKU
+.\scripts\deploy.ps1 -Environment prod -Sku P1V3 -AzureOpenAiEndpoint "https://your-openai.openai.azure.com"
+```
+
+### Quick Deploy (Bash)
+
+```bash
+# Deploy to development environment
+./scripts/deploy.sh --endpoint "https://your-openai.openai.azure.com"
+
+# Deploy to production with higher SKU
+./scripts/deploy.sh --environment prod --sku P1V3 --endpoint "https://your-openai.openai.azure.com"
+```
+
+### GitHub Actions CI/CD
+
+For automated deployments, configure GitHub Actions:
+
+1. **Create Service Principal**:
+   ```bash
+   az ad sp create-for-rbac --name "gtm-agent-deploy" --role contributor \
+     --scopes /subscriptions/{subscription-id} --sdk-auth
+   ```
+
+2. **Add GitHub Secrets**:
+   | Secret | Description |
+   |--------|-------------|
+   | `AZURE_CREDENTIALS` | JSON output from step 1 |
+   | `AZURE_SUBSCRIPTION_ID` | Your Azure subscription ID |
+   | `AZURE_OPENAI_ENDPOINT` | Azure OpenAI endpoint URL |
+   | `API_KEY` | (Optional) API key for authentication |
+
+3. **Trigger Deployment**:
+   - Push to `main` branch for automatic deployment
+   - Use workflow dispatch for manual deployment with environment selection
+
+### Infrastructure Files
+
+| File | Description |
+|------|-------------|
+| `infra/main.bicep` | Main Bicep template |
+| `infra/modules/appservice.bicep` | App Service configuration |
+| `infra/modules/monitoring.bicep` | Application Insights + Log Analytics |
+| `infra/parameters.json` | Default parameter values |
+| `app.py` | Entry point that sets up PYTHONPATH for Oryx |
+| `gunicorn.conf.py` | Gunicorn configuration |
+
+### Deployment Architecture
+
+The deployment uses Azure App Service with Oryx build system:
+
+1. **Build Phase**: Oryx detects Python from `requirements.txt` and creates a virtual environment
+2. **Runtime**: Oryx extracts the compressed app to a temp directory (`/tmp/xxxx`)
+3. **Startup**: `app.py` dynamically adds the extraction directory to `sys.path` so `src` module can be imported
+4. **Server**: Gunicorn starts with Uvicorn workers for async FastAPI support
+
+### Endpoints After Deployment
+
+| Endpoint | URL |
+|----------|-----|
+| Web App | `https://gtm-agent-{env}-app.azurewebsites.net` |
+| MCP Server | `https://gtm-agent-{env}-app.azurewebsites.net/mcp/mcp` |
+| Health Check | `https://gtm-agent-{env}-app.azurewebsites.net/health` |
+| API Docs | `https://gtm-agent-{env}-app.azurewebsites.net/docs` |
+
+### View Logs
+
+```bash
+az webapp log tail --resource-group rg-gtm-agent-dev --name gtm-agent-dev-app
+```
+
 ## M365 Copilot Integration
 
 The Solution Engineer Agent can be integrated with Microsoft 365 Copilot Chat through several options:

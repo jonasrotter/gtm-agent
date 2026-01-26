@@ -1,0 +1,213 @@
+# =============================================================================
+# GTM Agent - Azure App Service Deployment
+# =============================================================================
+# Deploys the GTM Agent to Azure App Service
+#
+# Prerequisites:
+# 1. Create Azure credentials (Service Principal):
+#    az ad sp create-for-rbac --name "gtm-agent-deploy" --role contributor \
+#      --scopes /subscriptions/{subscription-id} --sdk-auth
+#
+# 2. Add GitHub Secrets:
+#    - AZURE_CREDENTIALS: JSON output from step 1
+#    - AZURE_SUBSCRIPTION_ID: Your Azure subscription ID
+#    - AZURE_OPENAI_ENDPOINT: Azure OpenAI endpoint URL
+#    - API_KEY: (Optional) API key for authentication
+# =============================================================================
+
+name: Deploy to Azure App Service
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.vscode/**'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      sku:
+        description: 'App Service SKU'
+        required: true
+        default: 'B1'
+        type: choice
+        options:
+          - B1
+          - B2
+          - P1V3
+
+env:
+  AZURE_RESOURCE_GROUP: rg-gtm-agent-${{ github.event.inputs.environment || 'dev' }}
+  AZURE_LOCATION: westeurope
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # ==========================================================================
+  # Build and Test
+  # ==========================================================================
+  build:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run linting
+        run: |
+          pip install ruff
+          ruff check src/
+
+      - name: Run tests
+        run: |
+          pytest tests/ -v --tb=short --ignore=tests/integration/
+
+      - name: Create deployment package
+        run: |
+          # Create ZIP package excluding unnecessary files
+          zip -r deploy.zip . \
+            -x ".git/*" \
+            -x ".github/*" \
+            -x ".venv/*" \
+            -x ".vscode/*" \
+            -x "__pycache__/*" \
+            -x "*.pyc" \
+            -x ".pytest_cache/*" \
+            -x ".ruff_cache/*" \
+            -x "tests/*" \
+            -x "docs/*" \
+            -x ".env" \
+            -x ".env.local"
+
+      - name: Upload deployment package
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-package
+          path: deploy.zip
+          retention-days: 1
+
+  # ==========================================================================
+  # Deploy Infrastructure
+  # ==========================================================================
+  deploy-infra:
+    name: Deploy Infrastructure
+    runs-on: ubuntu-latest
+    needs: build
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    
+    outputs:
+      webAppName: ${{ steps.deploy.outputs.webAppName }}
+      webAppUrl: ${{ steps.deploy.outputs.webAppUrl }}
+      mcpEndpoint: ${{ steps.deploy.outputs.mcpServerEndpoint }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Create Resource Group
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            az group create \
+              --name ${{ env.AZURE_RESOURCE_GROUP }} \
+              --location ${{ env.AZURE_LOCATION }} \
+              --tags Application=gtm-agent Environment=${{ github.event.inputs.environment || 'dev' }}
+
+      - name: Deploy Bicep template
+        id: deploy
+        uses: azure/arm-deploy@v2
+        with:
+          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          resourceGroupName: ${{ env.AZURE_RESOURCE_GROUP }}
+          template: ./infra/main.bicep
+          parameters: >
+            appName=gtm-agent
+            environment=${{ github.event.inputs.environment || 'dev' }}
+            appServicePlanSku=${{ github.event.inputs.sku || 'B1' }}
+            azureOpenAiEndpoint=${{ secrets.AZURE_OPENAI_ENDPOINT }}
+            azureOpenAiDeployment=gpt-4o
+            apiKey=${{ secrets.API_KEY }}
+            logLevel=INFO
+          failOnStdErr: false
+
+  # ==========================================================================
+  # Deploy Application
+  # ==========================================================================
+  deploy-app:
+    name: Deploy Application
+    runs-on: ubuntu-latest
+    needs: deploy-infra
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+
+    steps:
+      - name: Download deployment package
+        uses: actions/download-artifact@v4
+        with:
+          name: deploy-package
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ needs.deploy-infra.outputs.webAppName }}
+          package: deploy.zip
+
+      - name: Wait for deployment
+        run: sleep 30
+
+      - name: Health check
+        run: |
+          echo "Checking health endpoint..."
+          for i in {1..10}; do
+            response=$(curl -s -o /dev/null -w "%{http_code}" "${{ needs.deploy-infra.outputs.webAppUrl }}/health" || echo "000")
+            if [ "$response" = "200" ]; then
+              echo "✅ Health check passed!"
+              exit 0
+            fi
+            echo "Attempt $i: Got $response, waiting..."
+            sleep 10
+          done
+          echo "❌ Health check failed after 10 attempts"
+          exit 1
+
+      - name: Output deployment info
+        run: |
+          echo "=========================================="
+          echo "🚀 Deployment Complete!"
+          echo "=========================================="
+          echo "Web App URL: ${{ needs.deploy-infra.outputs.webAppUrl }}"
+          echo "MCP Server:  ${{ needs.deploy-infra.outputs.mcpEndpoint }}"
+          echo "Health:      ${{ needs.deploy-infra.outputs.webAppUrl }}/health"
+          echo "API Docs:    ${{ needs.deploy-infra.outputs.webAppUrl }}/docs"
+          echo "=========================================="

@@ -14,3 +14,7 @@ azure-identity>=1.15.0
 
 # MCP Server support
 mcp[cli]
+
+# Production server
+gunicorn>=21.0.0
+

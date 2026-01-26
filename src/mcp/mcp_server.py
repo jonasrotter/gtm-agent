@@ -14,6 +14,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
 from src.agents.solution_engineer import SolutionEngineerAgent
 from src.lib.logging import get_logger
@@ -22,11 +23,19 @@ from src.lib.logging import get_logger
 logger = get_logger(__name__)
 
 
+# Configure transport security
+# Disable DNS rebinding protection since Azure App Service provides its own security layer
+# and the Host header validation causes issues with Azure's routing
+transport_security = TransportSecuritySettings(
+    enable_dns_rebinding_protection=False,
+)
+
 # Create FastMCP server with stateless HTTP mode for simple mounting
 # Default streamable HTTP endpoint is /mcp, so full path becomes /mcp/mcp
 mcp = FastMCP(
     "SolutionEngineerMCP",
     stateless_http=True,
+    transport_security=transport_security,
 )
 
 
