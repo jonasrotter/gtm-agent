@@ -5,7 +5,7 @@ A multi-agentic AI assistant that helps Solution Engineers by researching Azure 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-green.svg)](https://fastapi.tiangolo.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-118%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-129%20passed-brightgreen.svg)]()
 
 ## Features
 
@@ -27,7 +27,7 @@ A multi-agentic AI assistant that helps Solution Engineers by researching Azure 
 
 ## Agentic Architecture
 
-The GTM Agent uses a **simplified single-layer architecture** powered by [agent-framework](https://pypi.org/project/agent-framework/) and [github-copilot-sdk](https://pypi.org/project/github-copilot-sdk/). Each specialized agent uses `ChatAgent` with `HostedMCPTool` for direct MCP server integration.
+The GTM Agent uses a **simplified single-layer architecture** powered by [semantic-kernel](https://pypi.org/project/semantic-kernel/) and [github-copilot-sdk](https://pypi.org/project/github-copilot-sdk/). Each specialized agent uses `ChatCompletionAgent` with `McpServerTool` for direct MCP server integration.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -38,7 +38,7 @@ The GTM Agent uses a **simplified single-layer architecture** powered by [agent-
 │                      SolutionEngineerAgent                                   │
 │                        (Orchestrator)                                        │
 │    ┌─────────────────────────────────────────────────────────────────┐      │
-│    │  ChatAgent with sub-agents as tools via .as_tool() pattern      │      │
+│    │  ChatCompletionAgent with sub-agents as tools                   │      │
 │    │  • Query classification (research/architecture/code)            │      │
 │    │  • Azure-scope validation (rejects non-Azure queries)           │      │
 │    │  • Intelligent routing to specialized sub-agents                │      │
@@ -50,8 +50,8 @@ The GTM Agent uses a **simplified single-layer architecture** powered by [agent-
 │  │ Researcher  │     │  Architect  │     │GHCPCoding   │                    │
 │  │   Agent     │     │    Agent    │     │   Agent     │                    │
 │  │             │     │             │     │             │                    │
-│  │ ChatAgent + │     │ ChatAgent + │     │ CopilotSDK  │                    │
-│  │HostedMCPTool│     │HostedMCPTool│     │ @define_tool│                    │
+│  │ ChatCompl.  │     │ ChatCompl.  │     │ CopilotSDK  │                    │
+│  │+McpServerTool│    │+McpServerTool│    │ @define_tool│                    │
 │  └──────┬──────┘     └──────┬──────┘     └──────┬──────┘                    │
 │         │                   │                   │                            │
 │         ▼                   ▼                   ▼                            │
@@ -67,12 +67,12 @@ The GTM Agent uses a **simplified single-layer architecture** powered by [agent-
 ### How the Agents Work Together
 
 1. **Query Intake**: User submits a query to `/agent/query`
-2. **Orchestration**: `SolutionEngineerAgent` classifies the query using its `ChatAgent`
-3. **Tool Routing**: Query is routed via `.as_tool()` to the appropriate sub-agent:
+2. **Orchestration**: `SolutionEngineerAgent` classifies the query using its `ChatCompletionAgent`
+3. **Tool Routing**: Query is routed via sub-agent tools to the appropriate specialized agent:
    - `research` tool → `ResearcherAgent` (Microsoft Learn MCP)
    - `architecture` tool → `ArchitectAgent` (Azure MCP)
    - `code` tool → `GHCPCodingAgent` (GitHub Copilot SDK)
-4. **MCP Execution**: Sub-agents use `HostedMCPTool` or Copilot SDK for direct MCP integration
+4. **MCP Execution**: Sub-agents use `McpServerTool` or Copilot SDK for direct MCP integration
 5. **Response**: Results are returned with sources, recommendations, or generated code
 
 ## MCP Server Integration
@@ -202,7 +202,7 @@ GET /agent/health     # Agent-specific health
 
 ### 🔍 ResearcherAgent - Documentation & Knowledge
 
-The ResearcherAgent helps you find accurate, sourced information from official Azure documentation. It uses `HostedMCPTool` to directly integrate with the Microsoft Learn MCP server:
+The ResearcherAgent helps you find accurate, sourced information from official Azure documentation. It uses `McpServerTool` to directly integrate with the Microsoft Learn MCP server:
 
 - `microsoft_docs_search` - Search Microsoft Learn and Azure docs
 - `microsoft_docs_fetch` - Retrieve full document content  
@@ -214,7 +214,7 @@ User Query → SolutionEngineerAgent → routes to research tool
                                            ↓
                               ResearcherAgent.run(query)
                                            ↓
-                              HostedMCPTool calls Microsoft Learn MCP
+                              McpServerTool calls Microsoft Learn MCP
                                            ↓
                               Synthesizes response with sources
 ```
@@ -245,7 +245,7 @@ Invoke-RestMethod -Uri "http://localhost:8000/agent/query" -Method Post `
 
 ### 🏗️ ArchitectAgent - Best Practices & Reviews
 
-The ArchitectAgent provides architecture guidance aligned with Azure Well-Architected Framework. It uses `HostedMCPTool` to directly integrate with the Azure MCP server for best practices and recommendations.
+The ArchitectAgent provides architecture guidance aligned with Azure Well-Architected Framework. It uses `McpServerTool` to directly integrate with the Azure MCP server for best practices and recommendations.
 
 **WAF Pillars Focus:**
 - Reliability
@@ -260,7 +260,7 @@ User Query → SolutionEngineerAgent → routes to architecture tool
                                            ↓
                               ArchitectAgent.run(query)
                                            ↓
-                              HostedMCPTool calls Azure MCP
+                              McpServerTool calls Azure MCP
                                            ↓
                               Generates WAF-aligned recommendations
 ```
@@ -385,10 +385,11 @@ gtm-agent/
 │   ├── agents/           # AI agents with direct MCP integration
 │   │   ├── __init__.py   # Agent exports
 │   │   ├── base.py       # Helpers: create_azure_chat_client(), MCP URLs
-│   │   ├── researcher.py # ResearcherAgent with HostedMCPTool (Microsoft Learn)
-│   │   ├── architect.py  # ArchitectAgent with HostedMCPTool (Azure MCP)
+│   │   ├── models.py     # Agent-related Pydantic models
+│   │   ├── researcher.py # ResearcherAgent with McpServerTool (Microsoft Learn)
+│   │   ├── architect.py  # ArchitectAgent with McpServerTool (Azure MCP)
 │   │   ├── ghcp_coding_agent.py  # GHCPCodingAgent with GitHub Copilot SDK
-│   │   └── solution_engineer.py  # Orchestrator using .as_tool() pattern
+│   │   └── solution_engineer.py  # Orchestrator using sub-agent tool pattern
 │   ├── api/              # FastAPI application
 │   │   ├── main.py       # Application factory
 │   │   ├── middleware.py # Request logging, error handling
@@ -397,18 +398,32 @@ gtm-agent/
 │   │       └── agent.py  # /agent/query endpoint
 │   ├── lib/              # Shared utilities
 │   │   ├── agent_client.py  # AzureOpenAIChatClient implementation
-│   │   ├── logging.py    # Structured logging
-│   │   └── errors.py     # Custom exception classes
-│   └── models/           # Pydantic data models
+│   │   └── logging.py    # Structured logging
+│   ├── mcp/              # MCP server implementation
+│   │   ├── __init__.py
+│   │   └── mcp_server.py # Streamable HTTP MCP server
+│   ├── models/           # Pydantic data models
+│   └── config.py         # Pydantic Settings configuration
+├── infra/                # Azure Bicep infrastructure
+│   ├── main.bicep        # Main deployment template
+│   ├── parameters.json   # Default parameters
+│   └── modules/          # Modular Bicep templates
 ├── tests/
 │   ├── unit/             # Unit tests for agents and models
 │   ├── integration/      # Integration tests
 │   └── contract/         # API contract tests
-├── specs/                # Specification documents
-└── .github/              # CI/CD workflows
+├── scripts/              # Deployment scripts
+│   ├── deploy.ps1        # PowerShell deployment
+│   └── deploy.sh         # Bash deployment
+├── app.py                # Azure App Service entry point
+├── startup.sh            # Azure startup script
+├── gunicorn.conf.py      # Gunicorn configuration
+└── specs/                # Specification documents
 ```
 
 ## Configuration
+
+### Core Settings
 
 | Environment Variable | Description | Default |
 |---------------------|-------------|---------|
@@ -420,15 +435,35 @@ gtm-agent/
 | `LOG_FORMAT` | Log format (`json` or `console`) | `json` |
 | `AZURE_SUBSCRIPTION_ID` | For hypothesis validation | Optional |
 
+### GitHub Copilot SDK Settings
+
+| Environment Variable | Description | Default |
+|---------------------|-------------|---------|
+| `COPILOT_CLI_URL` | External Copilot CLI server URL (e.g., `localhost:4321`) | Empty (auto-spawn) |
+| `COPILOT_USE_AZURE_OPENAI` | Use Azure OpenAI as LLM provider (BYOK mode) | `false` |
+| `COPILOT_MODEL` | Model/deployment name for Copilot sessions | `gpt-4o` |
+| `COPILOT_AZURE_OPENAI_ENDPOINT` | Azure OpenAI endpoint URL for BYOK mode | Empty |
+| `COPILOT_AZURE_OPENAI_API_KEY` | Azure OpenAI API key for BYOK mode | Empty |
+| `COPILOT_AZURE_OPENAI_API_VERSION` | Azure OpenAI API version for BYOK mode | `2024-10-21` |
+
+### MCP Server Settings
+
+| Environment Variable | Description | Default |
+|---------------------|-------------|---------|
+| `MCP_MICROSOFT_DOCS_ENABLED` | Enable Microsoft Docs MCP server | `true` |
+| `MCP_AZURE_ENABLED` | Enable Azure MCP server | `true` |
+| `MCP_CONTEXT7_ENABLED` | Enable Context7 MCP server | `true` |
+| `MCP_TIMEOUT_SECONDS` | Timeout for MCP tool calls | `30` |
+
 ## Framework Integration
 
 This project uses two key frameworks:
 
-### agent-framework (PyPI)
-- `ChatAgent` - LLM-powered agent with tool calling capabilities
-- `HostedMCPTool` - Direct integration with MCP servers (no custom adapters needed)
-- `@ai_function` - Decorator to create tools from Python functions
-- `BaseChatClient` - Protocol for custom LLM clients (Azure OpenAI)
+### semantic-kernel (PyPI)
+- `ChatCompletionAgent` - LLM-powered agent with tool calling capabilities
+- `McpServerTool` - Direct integration with MCP servers (no custom adapters needed)
+- `@kernel_function` - Decorator to create tools from Python functions
+- `AzureChatCompletion` - Azure OpenAI integration with managed identity support
 
 ### github-copilot-sdk (PyPI)
 - `CopilotClient` - Manages Copilot CLI process lifecycle
@@ -439,10 +474,11 @@ This project uses two key frameworks:
 
 ## Key Design Principles
 
-- **Single-layer architecture**: Agents directly integrate with MCP servers via `HostedMCPTool`
-- **Sub-agents as tools**: Orchestrator uses `.as_tool()` pattern for clean routing
+- **Single-layer architecture**: Agents directly integrate with MCP servers via `McpServerTool`
+- **Sub-agents as tools**: Orchestrator uses sub-agent tool pattern for clean routing
 - **Direct MCP integration**: No intermediate service or tool layers
 - **Type-safe custom tools**: `@define_tool` with Pydantic models for GitHub Copilot SDK
+- **Managed Identity**: Azure OpenAI authentication via `DefaultAzureCredential`
 - **SC-007**: Non-Azure query rejection with helpful messaging
 
 ## Azure Deployment
