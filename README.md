@@ -50,7 +50,7 @@ uvicorn src.api:app --reload
 ### Prerequisites
 
 - Python 3.11+
-- Azure OpenAI deployment with GPT-4o
+- Azure OpenAI deployment with GPT-5.2
 
 ## API Usage
 
