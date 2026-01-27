@@ -143,9 +143,6 @@ See the [M365 Copilot Integration Guide](#m365-copilot-integration) below.
 3. **Install dependencies**
    ```bash
    pip install -r requirements.txt
-   
-   # For development
-   pip install -r requirements-dev.txt
    ```
 
 4. **Configure environment**
