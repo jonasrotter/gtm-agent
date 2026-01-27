@@ -1,4 +1,0 @@
-<step title="Incoming Request" date="2026-01-25T20:11:12.952" instance="f83f3e" url="/dump" method="GET" type="request" pid="768,1,23" Host="gtm-agent-dev-app.scm.azurewebsites.net" User-Agent="AZURECLI/2.74.0 (MSI)" Accept-Encoding="identity" Authorization="Bea..." x-ms-client-request-id="f744253c-fa29-11f0-8d8d-00155d662847" X-ARR-LOG-ID="f744253c-fa29-11f0-8d8d-00155d662847" CLIENT-IP="108.142.230.59:36674" X-SITE-DEPLOYMENT-ID="gtm-agent-dev-app" WAS-DEFAULT-HOSTNAME="gtm-agent-dev-app.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/dump" X-Client-IP="108.142.230.59" X-Client-Port="36674" >
-  <step title="Cleanup Xml Logs" date="2026-01-25T20:11:12.958" /><!-- duration: 6ms -->
-  <step title="Outgoing response" date="2026-01-25T20:11:13.161" type="response" statusCode="200" statusText="OK" /><!-- duration: 3ms -->
-</step><!-- duration: 214ms -->
