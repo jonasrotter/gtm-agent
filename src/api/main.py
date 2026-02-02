@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     setup_logging(settings.log_level)
 
     logger.info(
-        "Starting Solution Engineering Agent",
+        "Starting Orchestrator Agent",
         version=__version__,
         log_level=settings.log_level,
     )

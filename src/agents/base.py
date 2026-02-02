@@ -11,7 +11,7 @@ This replaces the previous complex BaseAgentWrapper with direct ChatAgent usage.
 
 import os
 
-from agent_framework import ChatAgent, HostedMCPTool, ai_function
+from agent_framework import ChatAgent, HostedMCPTool, MCPStreamableHTTPTool, ai_function
 from azure.identity import DefaultAzureCredential
 
 from src.lib.agent_client import AzureOpenAIChatClient
@@ -19,6 +19,42 @@ from src.lib.logging import get_logger
 
 
 logger = get_logger(__name__)
+
+
+# =============================================================================
+# Environment Detection
+# =============================================================================
+
+def is_azure_deployment() -> bool:
+    """
+    Detect if running in Azure deployment environment.
+    
+    Checks for Azure-specific environment variables that indicate
+    the app is running in Azure App Service, Container Apps, or Functions.
+    
+    Returns:
+        True if running in Azure, False if running locally.
+    """
+    # Explicit override via environment variable
+    explicit = os.environ.get("AZURE_DEPLOYMENT", "").lower()
+    if explicit == "true":
+        return True
+    if explicit == "false":
+        return False
+    
+    # Auto-detect Azure App Service
+    if os.environ.get("WEBSITE_INSTANCE_ID"):
+        return True
+    
+    # Auto-detect Azure Container Apps
+    if os.environ.get("CONTAINER_APP_NAME"):
+        return True
+    
+    # Auto-detect Azure Functions
+    if os.environ.get("FUNCTIONS_WORKER_RUNTIME"):
+        return True
+    
+    return False
 
 
 # =============================================================================
@@ -78,11 +114,14 @@ __all__ = [
     # MCP endpoints
     "MICROSOFT_LEARN_MCP_URL",
     "AZURE_MCP_URL",
+    # Environment detection
+    "is_azure_deployment",
     # Factory
     "create_azure_chat_client",
     # Re-exports from agent_framework
     "ChatAgent",
     "HostedMCPTool",
+    "MCPStreamableHTTPTool",
     "ai_function",
     # Azure
     "AzureOpenAIChatClient",

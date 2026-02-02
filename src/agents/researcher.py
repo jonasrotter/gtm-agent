@@ -1,13 +1,16 @@
 """
 Researcher Agent for Azure documentation research.
 
-Uses HostedMCPTool to connect directly to Microsoft Learn MCP endpoint
+Uses MCP tools to connect to Microsoft Learn MCP endpoint
 for searching and retrieving Azure documentation.
+
+- Local: MCPStreamableHTTPTool (direct HTTP connection)
+- Azure: HostedMCPTool (Azure AI hosted execution)
 """
 
-from agent_framework import ChatAgent, HostedMCPTool
+from agent_framework import ChatAgent, HostedMCPTool, MCPStreamableHTTPTool
 
-from src.agents.base import create_azure_chat_client, MICROSOFT_LEARN_MCP_URL
+from src.agents.base import create_azure_chat_client, MICROSOFT_LEARN_MCP_URL, is_azure_deployment
 from src.lib.logging import get_logger
 
 
@@ -52,18 +55,29 @@ class ResearcherAgent:
     """
     Researcher agent with Microsoft Learn MCP integration.
     
-    Uses HostedMCPTool to connect directly to the Microsoft Learn MCP
-    endpoint for documentation search and retrieval.
+    Uses environment detection to select the appropriate MCP tool:
+    - Local: MCPStreamableHTTPTool (direct HTTP to Microsoft Learn)
+    - Azure: HostedMCPTool (Azure AI hosted execution)
     """
     
     def __init__(self):
-        """Initialize ResearcherAgent with HostedMCPTool."""
-        self.mcp_tool = HostedMCPTool(
-            name="microsoft_learn",
-            url=MICROSOFT_LEARN_MCP_URL,
-            description="Search and fetch Azure documentation from Microsoft Learn",
-            approval_mode="never_require",  # Auto-approve doc searches
-        )
+        """Initialize ResearcherAgent with environment-appropriate MCP tool."""
+        if is_azure_deployment():
+            # Azure deployment: use HostedMCPTool (Azure AI handles MCP execution)
+            self.mcp_tool = HostedMCPTool(
+                name="microsoft_learn",
+                url=MICROSOFT_LEARN_MCP_URL,
+                description="Search and fetch Azure documentation from Microsoft Learn",
+                approval_mode="never_require",
+            )
+            logger.info("ResearcherAgent using HostedMCPTool (Azure deployment)", mcp_url=MICROSOFT_LEARN_MCP_URL)
+        else:
+            # Local development: use MCPStreamableHTTPTool (direct HTTP connection)
+            self.mcp_tool = MCPStreamableHTTPTool(
+                name="microsoft_learn",
+                url=MICROSOFT_LEARN_MCP_URL,
+            )
+            logger.info("ResearcherAgent using MCPStreamableHTTPTool (local)", mcp_url=MICROSOFT_LEARN_MCP_URL)
         
         self.agent = ChatAgent(
             chat_client=create_azure_chat_client(),
@@ -72,10 +86,7 @@ class ResearcherAgent:
             tools=self.mcp_tool,
         )
         
-        logger.info(
-            "ResearcherAgent initialized",
-            mcp_url=MICROSOFT_LEARN_MCP_URL,
-        )
+        logger.info("ResearcherAgent initialized")
     
     async def run(self, query: str) -> str:
         """
@@ -87,9 +98,17 @@ class ResearcherAgent:
         Returns:
             Researched answer with source citations.
         """
-        async with self.agent:
-            result = await self.agent.run(query)
-            return result.text
+        # MCPStreamableHTTPTool requires async context to establish connection
+        # HostedMCPTool doesn't need this (Azure AI handles it)
+        if isinstance(self.mcp_tool, MCPStreamableHTTPTool):
+            async with self.mcp_tool:
+                async with self.agent:
+                    result = await self.agent.run(query)
+                    return result.text
+        else:
+            async with self.agent:
+                result = await self.agent.run(query)
+                return result.text
     
     def as_tool(self):
         """

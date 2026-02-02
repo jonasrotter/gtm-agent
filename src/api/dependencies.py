@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from src.agents.researcher import ResearcherAgent
     from src.agents.architect import ArchitectAgent
     from src.agents.ghcp_coding_agent import GHCPCodingAgent
-    from src.agents.solution_engineer import SolutionEngineerAgent
+    from src.agents.orchestrator import OrchestratorAgent
 
 logger = get_logger(__name__)
 
@@ -62,16 +62,20 @@ def get_ghcp_coding_agent() -> "GHCPCodingAgent":
 
 
 @lru_cache
-def get_solution_engineer_agent() -> "SolutionEngineerAgent":
+def get_solution_engineer_agent() -> "OrchestratorAgent":
     """
-    Get SolutionEngineerAgent singleton.
+    Get OrchestratorAgent singleton.
 
     Returns:
-        Shared SolutionEngineerAgent orchestrator instance.
+        Shared OrchestratorAgent instance using Plan-Execute-Verify pattern.
+    
+    Note:
+        This function is named get_solution_engineer_agent for backwards compatibility.
+        Internally uses OrchestratorAgent which replaces SolutionEngineerAgent.
     """
-    from src.agents.solution_engineer import SolutionEngineerAgent  # noqa: PLC0415
+    from src.agents.orchestrator import OrchestratorAgent  # noqa: PLC0415
 
-    return SolutionEngineerAgent()
+    return OrchestratorAgent()
 
 
 async def verify_api_key(

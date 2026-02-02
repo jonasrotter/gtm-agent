@@ -1,13 +1,15 @@
-"""
-Architect Agent for Azure architecture best practices.
+"""Architect Agent for Azure architecture best practices.
 
-Uses HostedMCPTool to connect directly to Azure MCP endpoint
+Uses MCP tools to connect to Azure MCP endpoint
 for Well-Architected Framework guidance and best practices.
+
+- Local: MCPStreamableHTTPTool (direct HTTP connection)
+- Azure: HostedMCPTool (Azure AI hosted execution)
 """
 
-from agent_framework import ChatAgent, HostedMCPTool
+from agent_framework import ChatAgent, HostedMCPTool, MCPStdioTool
 
-from src.agents.base import create_azure_chat_client, AZURE_MCP_URL
+from src.agents.base import create_azure_chat_client, is_azure_deployment
 from src.lib.logging import get_logger
 
 
@@ -55,18 +57,34 @@ class ArchitectAgent:
     """
     Architect agent with Azure MCP integration.
     
-    Uses HostedMCPTool to connect directly to the Azure MCP endpoint
-    for architecture best practices and WAF guidance.
+    Uses environment detection to select the appropriate MCP tool:
+    - Local: MCPStreamableHTTPTool (direct HTTP to Azure MCP)
+    - Azure: HostedMCPTool (Azure AI hosted execution)
     """
     
     def __init__(self):
-        """Initialize ArchitectAgent with HostedMCPTool."""
-        self.mcp_tool = HostedMCPTool(
-            name="azure_best_practices",
-            url=AZURE_MCP_URL,
-            description="Get Azure architecture best practices and WAF guidance",
-            approval_mode="never_require",  # Auto-approve best practice queries
-        )
+        """Initialize ArchitectAgent with environment-appropriate MCP tool."""
+        if is_azure_deployment():
+            # Azure deployment: use HostedMCPTool (Azure AI handles MCP execution)
+            self.mcp_tool = HostedMCPTool(
+                name="azure_mcp",
+                url="https://api.mcp.github.com/azure",
+                description="Get Azure architecture best practices and WAF guidance",
+                approval_mode="never_require",
+            )
+            logger.info("ArchitectAgent using HostedMCPTool (Azure deployment)")
+        else:
+            # Local development: use MCPStdioTool to run Azure MCP Server locally
+            # Requires: Node.js installed, `az login` for Azure CLI authentication
+            # The Azure MCP Server uses DefaultAzureCredential for auth
+            # Note: Azure MCP doesn't support prompts/list, so we disable prompt loading
+            self.mcp_tool = MCPStdioTool(
+                name="azure_mcp",
+                command="npx",
+                args=["-y", "@azure/mcp@latest", "server", "start"],
+                load_prompts=False,  # Azure MCP doesn't support prompts/list
+            )
+            logger.info("ArchitectAgent using MCPStdioTool (local Azure MCP)")
         
         self.agent = ChatAgent(
             chat_client=create_azure_chat_client(),
@@ -75,10 +93,7 @@ class ArchitectAgent:
             tools=self.mcp_tool,
         )
         
-        logger.info(
-            "ArchitectAgent initialized",
-            mcp_url=AZURE_MCP_URL,
-        )
+        logger.info("ArchitectAgent initialized")
     
     async def run(self, query: str) -> str:
         """
@@ -90,9 +105,17 @@ class ArchitectAgent:
         Returns:
             Architecture guidance with WAF pillar mappings.
         """
-        async with self.agent:
-            result = await self.agent.run(query)
-            return result.text
+        # MCPStdioTool requires async context to manage the subprocess
+        # HostedMCPTool doesn't need this (Azure AI handles it)
+        if isinstance(self.mcp_tool, MCPStdioTool):
+            async with self.mcp_tool:
+                async with self.agent:
+                    result = await self.agent.run(query)
+                    return result.text
+        else:
+            async with self.agent:
+                result = await self.agent.run(query)
+                return result.text
     
     def as_tool(self):
         """
