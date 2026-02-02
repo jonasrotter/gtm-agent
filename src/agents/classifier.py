@@ -14,7 +14,7 @@ from enum import Enum
 from typing import Any
 
 try:
-    from src.lib.logging import get_logger
+    from src.utils.logging import get_logger
     logger = get_logger(__name__)
 except ImportError:
     # Fallback for testing without full dependencies

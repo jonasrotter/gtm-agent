@@ -11,7 +11,7 @@ for searching and retrieving Azure documentation.
 from agent_framework import ChatAgent, HostedMCPTool, MCPStreamableHTTPTool
 
 from src.agents.base import create_azure_chat_client, MICROSOFT_LEARN_MCP_URL, is_azure_deployment
-from src.lib.logging import get_logger
+from src.utils.logging import get_logger
 
 
 logger = get_logger(__name__)

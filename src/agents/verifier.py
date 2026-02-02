@@ -15,7 +15,7 @@ from src.agents.models import (
     VerificationResult,
     VerificationScore,
 )
-from src.lib.logging import get_logger
+from src.utils.logging import get_logger
 
 
 logger = get_logger(__name__)

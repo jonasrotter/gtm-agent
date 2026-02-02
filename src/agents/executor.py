@@ -23,7 +23,7 @@ from src.agents.models import (
     StepResult,
     StepStatus,
 )
-from src.lib.logging import get_logger
+from src.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from src.agents.researcher import ResearcherAgent

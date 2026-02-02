@@ -17,7 +17,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 
 from src.agents.solution_engineer import SolutionEngineerAgent
-from src.lib.logging import get_logger
+from src.utils.logging import get_logger
 
 
 logger = get_logger(__name__)

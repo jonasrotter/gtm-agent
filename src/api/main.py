@@ -16,7 +16,7 @@ from src import __version__
 from src.api.middleware import setup_middleware
 from src.api.routes import api_router
 from src.config import get_settings
-from src.lib.logging import get_logger, setup_logging
+from src.utils.logging import get_logger, setup_logging
 from src.mcp import mcp, mcp_lifespan
 
 

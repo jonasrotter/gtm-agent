@@ -14,8 +14,8 @@ import os
 from agent_framework import ChatAgent, HostedMCPTool, MCPStreamableHTTPTool, ai_function
 from azure.identity import DefaultAzureCredential
 
-from src.lib.agent_client import AzureOpenAIChatClient
-from src.lib.logging import get_logger
+from src.utils.agent_client import AzureOpenAIChatClient
+from src.utils.logging import get_logger
 
 
 logger = get_logger(__name__)

@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 from fastapi import Depends, Header, HTTPException, status
 
 from src.config import Settings, get_settings
-from src.lib.logging import get_logger
+from src.utils.logging import get_logger
 
 
 if TYPE_CHECKING:

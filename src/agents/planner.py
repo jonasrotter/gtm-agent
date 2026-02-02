@@ -9,7 +9,7 @@ from agent_framework import ChatAgent
 
 from src.agents.base import create_azure_chat_client
 from src.agents.models import ExecutionPlan, ToolName
-from src.lib.logging import get_logger
+from src.utils.logging import get_logger
 
 
 logger = get_logger(__name__)

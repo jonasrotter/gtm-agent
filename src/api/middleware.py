@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from src.lib.logging import bind_request_context, clear_request_context, get_logger
+from src.utils.logging import bind_request_context, clear_request_context, get_logger
 
 
 logger = get_logger(__name__)

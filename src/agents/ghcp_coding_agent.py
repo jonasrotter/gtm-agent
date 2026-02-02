@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 
 from src.agents.base import AZURE_MCP_URL, MICROSOFT_LEARN_MCP_URL
 from src.config import get_settings
-from src.lib.logging import get_logger
+from src.utils.logging import get_logger
 
 # GitHub Copilot SDK imports
 try:

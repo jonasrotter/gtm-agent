@@ -9,7 +9,7 @@ from typing import Annotated
 
 from agent_framework import ai_function
 
-from src.lib.logging import get_logger
+from src.utils.logging import get_logger
 
 
 logger = get_logger(__name__)

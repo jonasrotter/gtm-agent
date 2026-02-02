@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from src.api.dependencies import get_solution_engineer_agent
-from src.lib.logging import get_logger
+from src.utils.logging import get_logger
 
 
 if TYPE_CHECKING:

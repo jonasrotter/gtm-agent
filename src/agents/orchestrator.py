@@ -35,7 +35,7 @@ from src.agents.verifier import VerifierAgent
 from src.agents.researcher import ResearcherAgent
 from src.agents.architect import ArchitectAgent
 from src.agents.ghcp_coding_agent import GHCPCodingAgent
-from src.lib.logging import get_logger
+from src.utils.logging import get_logger
 
 
 logger = get_logger(__name__)
