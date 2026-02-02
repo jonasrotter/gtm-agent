@@ -1,6 +1,6 @@
 # GTM Agent - Solution Engineering Agent
 
-A multi-agentic AI assistant for Solution Engineers: research Azure docs, get architecture guidance, and generate code/CLI commands.
+A multi-agentic AI assistant for Solution Engineers: research Azure docs, get architecture guidance, and generate code/CLI commands. Powered by the **Plan-Execute-Verify (PEV)** pattern with intelligent query classification and parallel execution.
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-green.svg)](https://fastapi.tiangolo.com/)
@@ -8,11 +8,29 @@ A multi-agentic AI assistant for Solution Engineers: research Azure docs, get ar
 
 ## Features
 
+### Specialized Agents
+
 | Agent | Capability |
 |-------|------------|
 | 🔍 **ResearcherAgent** | Search Azure docs with citations via Microsoft Learn MCP |
 | 🏗️ **ArchitectAgent** | WAF-aligned architecture guidance via Azure MCP |
 | 💻 **GHCPCodingAgent** | Generate code, CLI commands, test plans via GitHub Copilot SDK |
+
+### Intelligent Query Classification
+
+| Category | Example | Processing |
+|----------|---------|------------|
+| **FACTUAL** | "What is Azure Blob Storage?" | Fast path (skip PEV) |
+| **HOWTO** | "How do I create a storage account?" | Lite PEV (1 iteration) |
+| **ARCHITECTURE** | "Best practices for App Service security" | Standard PEV (2 iterations) |
+| **CODE** | "Write Azure CLI to create RG" | Lite PEV (1 iteration) |
+| **COMPLEX** | "Design architecture and generate Bicep" | Full PEV (4 iterations) |
+
+### Performance Optimizations
+
+- ⚡ **Query Classification**: Routes simple queries directly to agents, bypassing planning overhead
+- 🔀 **Parallel Execution**: Independent plan steps run concurrently via `asyncio.gather()`
+- 🎯 **Adaptive Verification**: Threshold-based quality scoring (0.8 acceptance threshold)
 
 ## Architecture
 
@@ -20,8 +38,18 @@ A multi-agentic AI assistant for Solution Engineers: research Azure docs, get ar
 ┌──────────────────────────────────────────────────────────────┐
 │                    FastAPI /agent/query                       │
 ├──────────────────────────────────────────────────────────────┤
-│              SolutionEngineerAgent (Orchestrator)             │
-│     Routes queries to specialized agents based on intent      │
+│                    OrchestratorAgent                          │
+│           Plan-Execute-Verify (PEV) Pattern                   │
+├──────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐   │
+│  │ Classifier  │→ │   Planner   │→ │      Executor       │   │
+│  │ (routing)   │  │ (planning)  │  │ (parallel exec)     │   │
+│  └─────────────┘  └─────────────┘  └──────────┬──────────┘   │
+│                                               ↓              │
+│                                    ┌─────────────────────┐   │
+│                          ←─────────│     Verifier        │   │
+│                          (retry)   │ (quality scoring)   │   │
+│                                    └─────────────────────┘   │
 ├────────────────┬─────────────────┬───────────────────────────┤
 │ ResearcherAgent│  ArchitectAgent │     GHCPCodingAgent       │
 │ +McpServerTool │  +McpServerTool │     +CopilotSDK           │
@@ -98,13 +126,27 @@ The agent also acts as an MCP Server at `/mcp/mcp` for integration with:
 
 ```
 src/
-├── agents/          # ResearcherAgent, ArchitectAgent, GHCPCodingAgent
+├── agents/          # Agent implementations
+│   ├── orchestrator.py    # PEV workflow coordinator
+│   ├── classifier.py      # Query classification
+│   ├── planner.py         # Execution plan generation
+│   ├── executor.py        # Parallel step execution
+│   ├── verifier.py        # Quality scoring & feedback
+│   ├── researcher.py      # Azure docs research
+│   ├── architect.py       # Architecture guidance
+│   ├── ghcp_coding_agent.py  # Code generation
+│   └── solution_engineer.py  # Legacy orchestrator
 ├── api/             # FastAPI routes and middleware
 ├── mcp/             # MCP server implementation
 ├── models/          # Pydantic data models
+├── tools/           # Local tool implementations
+├── utils/           # Logging, client utilities
 └── config.py        # Settings
 infra/               # Azure Bicep templates
-tests/               # Unit, integration, contract tests
+tests/
+├── unit/            # Unit tests
+├── integration/     # Integration tests
+└── contract/        # Contract tests
 ```
 
 ## Development
@@ -112,7 +154,18 @@ tests/               # Unit, integration, contract tests
 ```bash
 pytest                          # Run tests
 pytest --cov=src               # With coverage
+pytest tests/unit/             # Unit tests only
 ruff check src tests           # Linting
+```
+
+### Running Integration Tests
+
+```bash
+# Start the server
+uvicorn src.api:app --reload
+
+# Run integration tests (in another terminal)
+python tests/integration/test_scenarios.py
 ```
 
 ## Azure Deployment
@@ -127,10 +180,35 @@ ruff check src tests           # Linting
 
 Deploys: App Service (Linux) + Application Insights + Log Analytics
 
+## How It Works
+
+### Plan-Execute-Verify (PEV) Pattern
+
+1. **Classify**: Analyze query complexity to determine optimal processing path
+2. **Plan**: Break down complex queries into discrete, actionable steps
+3. **Execute**: Run steps in parallel where dependencies allow
+4. **Verify**: Score results against quality dimensions (correctness, completeness, consistency)
+5. **Iterate**: If score < 0.8, refine plan and re-execute (up to 4 iterations)
+
+### Query Flow Example
+
+```
+User: "Design a high-availability architecture for a web app and generate the Bicep template"
+
+→ Classifier: COMPLEX (multi-part query)
+→ Planner: Creates 3 steps:
+    1. architecture: "HA design patterns for web apps"
+    2. architecture: "WAF recommendations for availability"  
+    3. code: "Generate Bicep template implementing the design"
+→ Executor: Runs steps 1 & 2 in parallel, then step 3
+→ Verifier: Score 0.85 → Accept
+→ Response: Architecture guidance + Bicep code
+```
+
 ## License
 
 MIT License - see [LICENSE](LICENSE)
 
 ---
 
-Built with [FastAPI](https://fastapi.tiangolo.com/), [semantic-kernel](https://pypi.org/project/semantic-kernel/), and [github-copilot-sdk](https://pypi.org/project/github-copilot-sdk/)
+Built with [FastAPI](https://fastapi.tiangolo.com/), [agent-framework](https://pypi.org/project/agent-framework/), and [github-copilot-sdk](https://pypi.org/project/github-copilot-sdk/)
