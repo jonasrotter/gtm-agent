@@ -16,10 +16,8 @@ from agent_framework._types import (
     ChatMessage,
     ChatOptions,
     ChatResponse,
-    Contents,
-    FunctionCallContent,
+    Content,
     Role,
-    TextContent,
 )
 from agent_framework import use_function_invocation
 
@@ -332,13 +330,13 @@ class AzureOpenAIChatClient(BaseChatClient):
             
             # Add text content if present
             if content:
-                contents.append(TextContent(text=content))
+                contents.append(Content.from_text(content))
             
             # Add function calls if present (tool calls from the LLM)
             if message and message.tool_calls:
                 for tool_call in message.tool_calls:
                     contents.append(
-                        FunctionCallContent(
+                        Content.from_function_call(
                             call_id=tool_call.id,
                             name=tool_call.function.name,
                             arguments=tool_call.function.arguments,
@@ -414,7 +412,7 @@ class AzureOpenAIChatClient(BaseChatClient):
                     delta = chunk.choices[0].delta
                     if delta.content:
                         yield ChatResponseUpdate(
-                            contents=[TextContent(text=delta.content)],
+                            contents=[Content.from_text(delta.content)],
                             role="assistant",
                         )
                         
