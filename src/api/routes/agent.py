@@ -4,6 +4,7 @@ Agent query endpoints.
 Provides /agent/query endpoint for interacting with the Solution Engineering Agent.
 """
 
+import asyncio
 import time
 from typing import TYPE_CHECKING, Annotated
 
@@ -11,6 +12,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from src.api.dependencies import get_solution_engineer_agent
+from src.agents.classifier import QueryClassifier
+from src.config import get_settings
 from src.utils.logging import get_logger
 
 
@@ -106,6 +109,10 @@ class QueryResponse(BaseModel):
         default=None,
         description="Detailed verification scores by dimension (correctness, completeness, consistency)",
     )
+    query_category: str | None = Field(
+        default=None,
+        description="Classification of the query: 'factual', 'howto', 'architecture', 'code', or 'complex'",
+    )
 
 
 class ErrorResponse(BaseModel):
@@ -153,16 +160,50 @@ async def query_agent(
         HTTPException: For validation errors or service failures.
     """
     start_time = time.perf_counter()
+    settings = get_settings()
 
     try:
+        # Classify query to determine appropriate timeout
+        classifier = QueryClassifier()
+        category = classifier.classify(request.content)
+        
+        # Use extended timeout for complex queries
+        if category.value == "complex":
+            timeout = settings.api_complex_timeout_seconds
+        else:
+            timeout = settings.api_request_timeout_seconds
+        
         logger.info(
             "Received query",
             content_preview=request.content[:100] if request.content else "",
             session_id=request.session_id,
+            category=category.value,
+            timeout_seconds=timeout,
         )
 
-        # Process query through SolutionEngineerAgent with session support
-        agent_response = await agent.run(request.content, session_id=request.session_id)
+        # Process query through SolutionEngineerAgent with timeout protection
+        try:
+            agent_response = await asyncio.wait_for(
+                agent.run(request.content, session_id=request.session_id),
+                timeout=timeout,
+            )
+        except asyncio.TimeoutError:
+            processing_time_ms = int((time.perf_counter() - start_time) * 1000)
+            logger.warning(
+                "Query timed out",
+                timeout_seconds=timeout,
+                processing_time_ms=processing_time_ms,
+                category=category.value,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+                detail={
+                    "error_code": "REQUEST_TIMEOUT",
+                    "message": f"Query processing timed out after {timeout} seconds",
+                    "processing_time_ms": processing_time_ms,
+                    "category": category.value,
+                },
+            )
 
         processing_time_ms = int((time.perf_counter() - start_time) * 1000)
 
@@ -211,15 +252,29 @@ async def query_agent(
             plan_rationale=agent_response.plan_rationale,
             execution_steps=execution_steps,
             score_details=score_details,
+            query_category=agent_response.query_category,
         )
 
     except Exception as e:
-        logger.exception("Unexpected error processing query", error=str(e))
+        processing_time_ms = int((time.perf_counter() - start_time) * 1000)
+        error_type = type(e).__name__
+        error_message = str(e)
+        
+        logger.exception(
+            "Unexpected error processing query",
+            error_type=error_type,
+            error_message=error_message,
+            processing_time_ms=processing_time_ms,
+            content_preview=request.content[:100] if request.content else "",
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
                 "error_code": "INTERNAL_ERROR",
                 "message": "An unexpected error occurred",
+                "error_type": error_type,
+                "error_details": error_message[:500],  # Include truncated error details
+                "processing_time_ms": processing_time_ms,
             },
         ) from e
 

@@ -16,8 +16,10 @@ from agent_framework._types import (
     ChatMessage,
     ChatOptions,
     ChatResponse,
-    Content,
+    Contents,
+    FunctionCallContent,
     Role,
+    TextContent,
 )
 from agent_framework import use_function_invocation
 
@@ -260,11 +262,18 @@ class AzureOpenAIChatClient(BaseChatClient):
         
         # First apply kwargs['options'] (framework default options)
         if "options" in kwargs and kwargs["options"]:
-            merged_options.update(kwargs["options"])
+            opts = kwargs["options"]
+            if hasattr(opts, 'to_dict'):
+                merged_options.update(opts.to_dict())
+            elif isinstance(opts, dict):
+                merged_options.update(opts)
         
         # Then overlay chat_options (explicit options)
         if chat_options:
-            merged_options.update(chat_options)
+            if hasattr(chat_options, 'to_dict'):
+                merged_options.update(chat_options.to_dict())
+            elif isinstance(chat_options, dict):
+                merged_options.update(chat_options)
         
         openai_messages = self._convert_messages(list(messages))
         openai_tools = self._convert_tools(merged_options.get("tools"))
@@ -323,13 +332,13 @@ class AzureOpenAIChatClient(BaseChatClient):
             
             # Add text content if present
             if content:
-                contents.append(Content.from_text(content))
+                contents.append(TextContent(text=content))
             
             # Add function calls if present (tool calls from the LLM)
             if message and message.tool_calls:
                 for tool_call in message.tool_calls:
                     contents.append(
-                        Content.from_function_call(
+                        FunctionCallContent(
                             call_id=tool_call.id,
                             name=tool_call.function.name,
                             arguments=tool_call.function.arguments,
@@ -405,7 +414,7 @@ class AzureOpenAIChatClient(BaseChatClient):
                     delta = chunk.choices[0].delta
                     if delta.content:
                         yield ChatResponseUpdate(
-                            contents=[Content.from_text(delta.content)],
+                            contents=[TextContent(text=delta.content)],
                             role="assistant",
                         )
                         

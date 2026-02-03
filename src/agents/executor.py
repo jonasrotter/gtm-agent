@@ -23,6 +23,7 @@ from src.agents.models import (
     StepResult,
     StepStatus,
 )
+from src.config import get_settings
 from src.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -306,14 +307,22 @@ EXPECTED OUTPUT: {step.expected_output}{context}
 
 Call the {step.tool.value} tool with the query above."""
 
+        settings = get_settings()
+        step_timeout = settings.step_execution_timeout_seconds
+
         try:
             logger.debug(
                 "Executing step",
                 step_number=step.step_number,
                 tool=step.tool.value,
+                timeout_seconds=step_timeout,
             )
             
-            result = await self.agent.run(execution_prompt)
+            # Execute with step-level timeout protection
+            result = await asyncio.wait_for(
+                self.agent.run(execution_prompt),
+                timeout=step_timeout,
+            )
             
             step_duration = int((time.perf_counter() - step_start) * 1000)
             
@@ -328,6 +337,26 @@ Call the {step.tool.value} tool with the query above."""
             logger.debug(
                 "Step completed",
                 step_number=step.step_number,
+                duration_ms=step_duration,
+            )
+            
+            return step_result
+        
+        except asyncio.TimeoutError:
+            step_duration = int((time.perf_counter() - step_start) * 1000)
+            
+            step_result = StepResult(
+                step_number=step.step_number,
+                tool_used=step.tool.value,
+                status=StepStatus.FAILED,
+                error=f"Step timed out after {step_timeout}s",
+                duration_ms=step_duration,
+            )
+            
+            logger.warning(
+                "Step timed out",
+                step_number=step.step_number,
+                timeout_seconds=step_timeout,
                 duration_ms=step_duration,
             )
             
@@ -363,8 +392,12 @@ Call the {step.tool.value} tool with the query above."""
         Returns:
             The tool's response text.
         """
+        settings = get_settings()
         execution_prompt = f"Call the {tool} tool with this query: {query}"
         
         async with self.agent:
-            result = await self.agent.run(execution_prompt)
+            result = await asyncio.wait_for(
+                self.agent.run(execution_prompt),
+                timeout=settings.step_execution_timeout_seconds,
+            )
             return result.text

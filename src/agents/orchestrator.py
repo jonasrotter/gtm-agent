@@ -11,6 +11,7 @@ Replaces SolutionEngineerAgent with a GroupChat-based workflow that:
 Supports iteration on verification failure and human escalation.
 """
 
+import time
 import uuid
 from collections import OrderedDict
 from typing import Any
@@ -35,6 +36,7 @@ from src.agents.verifier import VerifierAgent
 from src.agents.researcher import ResearcherAgent
 from src.agents.architect import ArchitectAgent
 from src.agents.ghcp_coding_agent import GHCPCodingAgent
+from src.config import get_settings
 from src.utils.logging import get_logger
 
 
@@ -293,6 +295,7 @@ class OrchestratorAgent:
             ],
             score_details=None,  # No verification scores
             plan_rationale=f"Query classified as {category.value} - bypassed PEV for efficiency",
+            query_category=category.value,
         )
         
         # Save session context
@@ -337,36 +340,68 @@ class OrchestratorAgent:
         """
         max_iterations = config.get("max_iterations", self.DEFAULT_MAX_ITERATIONS)
         threshold = config.get("threshold", self.DEFAULT_ACCEPTANCE_THRESHOLD)
+        early_accept_threshold = config.get("early_accept_threshold", 0.85)
+        settings = get_settings()
+        
+        # Use extended timeout for complex queries
+        if category.value == "complex":
+            pev_timeout = settings.pev_complex_timeout_seconds
+        else:
+            pev_timeout = settings.pev_loop_timeout_seconds
+        
+        # Estimated time per iteration for time-aware budgeting
+        estimated_iteration_time = 45  # seconds
         
         # Determine max steps based on category
+        # Reduced complex from 4 to 3 to avoid timeouts
         max_steps_map = {
             "factual": 1,
             "code": 1,
             "howto": 2,
             "architecture": 2,
-            "complex": 4,
+            "complex": 3,  # Reduced from 4 to fit within timeout budget
         }
-        max_steps = max_steps_map.get(category.value, 4)
+        max_steps = max_steps_map.get(category.value, 3)
         
         logger.info(
             f"Running PEV loop",
             category=category.value,
             max_iterations=max_iterations,
             threshold=threshold,
+            early_accept_threshold=early_accept_threshold,
             max_steps=max_steps,
+            timeout_seconds=pev_timeout,
         )
         
-        # Run PEV loop
+        # Run PEV loop with time budget
+        pev_start_time = time.perf_counter()
         iteration = 0
         best_result: ExecutionResult | None = None
         best_verification: VerificationResult | None = None
         current_plan: ExecutionPlan | None = None
         feedback: str = ""
+        timeout_reached = False
         
         while iteration < max_iterations:
+            # Check cumulative time budget before starting new iteration
+            elapsed_time = time.perf_counter() - pev_start_time
+            if elapsed_time >= pev_timeout:
+                logger.warning(
+                    "PEV loop time budget exhausted",
+                    elapsed_seconds=elapsed_time,
+                    timeout_seconds=pev_timeout,
+                    iteration=iteration,
+                )
+                timeout_reached = True
+                break
+            
             iteration += 1
             
-            logger.info(f"PEV iteration {iteration}/{max_iterations}")
+            logger.info(
+                f"PEV iteration {iteration}/{max_iterations}",
+                elapsed_seconds=round(elapsed_time, 1),
+                remaining_seconds=round(pev_timeout - elapsed_time, 1),
+            )
             
             # Phase 1: Plan (pass max_steps and category for enforcement)
             if iteration == 1:
@@ -411,6 +446,16 @@ class OrchestratorAgent:
                 )
                 break
             
+            # Early accept: High quality on first try - no need for more iterations
+            if early_accept_threshold and verification.score.overall >= early_accept_threshold:
+                logger.info(
+                    "Early acceptance - high quality response",
+                    score=verification.score.overall,
+                    early_accept_threshold=early_accept_threshold,
+                    iteration=iteration,
+                )
+                break
+            
             # Accept if score meets category threshold even without explicit ACCEPT
             if verification.score.overall >= threshold:
                 logger.info(
@@ -429,6 +474,31 @@ class OrchestratorAgent:
                 )
                 break
             
+            # Check time budget before continuing to next iteration
+            elapsed_time = time.perf_counter() - pev_start_time
+            remaining_time = pev_timeout - elapsed_time
+            
+            # Time-aware budget check: Only continue if we have enough time for another iteration
+            if remaining_time < estimated_iteration_time:
+                logger.info(
+                    "Insufficient time for another iteration, accepting current result",
+                    remaining_seconds=round(remaining_time, 1),
+                    estimated_iteration_time=estimated_iteration_time,
+                    iteration=iteration,
+                    current_score=verification.score.overall,
+                )
+                break
+            
+            if elapsed_time >= pev_timeout:
+                logger.warning(
+                    "PEV loop time budget exhausted mid-iteration",
+                    elapsed_seconds=elapsed_time,
+                    timeout_seconds=pev_timeout,
+                    iteration=iteration,
+                )
+                timeout_reached = True
+                break
+            
             # Prepare feedback for next iteration
             feedback = verification.feedback_for_replanning
             if not feedback:
@@ -441,9 +511,21 @@ class OrchestratorAgent:
             )
         
         # Build response
+        # Mark for human review if timeout reached without good results
         requires_human_review = (
-            best_verification.decision == VerificationDecision.ESCALATE or
-            best_verification.score.overall < threshold
+            (best_verification and best_verification.decision == VerificationDecision.ESCALATE) or
+            (best_verification and best_verification.score.overall < threshold) or
+            timeout_reached
+        )
+        
+        # Log final PEV loop status
+        total_pev_time = time.perf_counter() - pev_start_time
+        logger.info(
+            "PEV loop completed",
+            total_time_seconds=round(total_pev_time, 1),
+            iterations_completed=iteration,
+            timeout_reached=timeout_reached,
+            final_score=best_verification.score.overall if best_verification else None,
         )
         
         # Save session context
@@ -494,6 +576,7 @@ class OrchestratorAgent:
             execution_steps=execution_steps,
             score_details=score_details,
             plan_rationale=current_plan.rationale if current_plan else None,
+            query_category=category.value,
         )
         
         logger.info(
@@ -502,6 +585,7 @@ class OrchestratorAgent:
             score=response.verification_score,
             iterations=response.iterations_used,
             requires_review=response.requires_human_review,
+            category=response.query_category,
         )
         
         return response

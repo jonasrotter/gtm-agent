@@ -310,16 +310,26 @@ Respond with ONLY a valid VerificationResult JSON object. No additional text bef
         """
         normalized = {}
         
+        def safe_float(val, default=0.5) -> float:
+            """Safely convert value to float, handling nested dicts."""
+            if isinstance(val, dict):
+                # Handle nested structures like {"value": 0.8} or {"score": 0.8}
+                return float(val.get("value", val.get("score", val.get("rating", default))))
+            try:
+                return float(val) if val is not None else default
+            except (TypeError, ValueError):
+                return default
+        
         # Handle score object - normalize to VerificationScore format
         # LLM may use "score" or "scores"
         score_data = data.get("score", data.get("scores", {}))
         
         if isinstance(score_data, dict) and score_data:
-            correctness = float(score_data.get("correctness", score_data.get("accuracy", 0.5)))
-            completeness = float(score_data.get("completeness", score_data.get("coverage", 0.5)))
-            consistency = float(score_data.get("consistency", score_data.get("coherence", 0.5)))
+            correctness = safe_float(score_data.get("correctness", score_data.get("accuracy", 0.5)))
+            completeness = safe_float(score_data.get("completeness", score_data.get("coverage", 0.5)))
+            consistency = safe_float(score_data.get("consistency", score_data.get("coherence", 0.5)))
             # Overall might be in score_data or at root level
-            overall = float(score_data.get("overall", 
+            overall = safe_float(score_data.get("overall", 
                 data.get("overall_score", data.get("overall",
                     0.4 * correctness + 0.35 * completeness + 0.25 * consistency))))
             normalized["score"] = {
@@ -339,10 +349,10 @@ Respond with ONLY a valid VerificationResult JSON object. No additional text bef
             }
         else:
             # Look for individual score fields at top level or overall_score
-            correctness = float(data.get("correctness", data.get("accuracy", 0.5)))
-            completeness = float(data.get("completeness", data.get("coverage", 0.5)))
-            consistency = float(data.get("consistency", data.get("coherence", 0.5)))
-            overall = float(data.get("overall_score", data.get("overall", data.get("total_score",
+            correctness = safe_float(data.get("correctness", data.get("accuracy", 0.5)))
+            completeness = safe_float(data.get("completeness", data.get("coverage", 0.5)))
+            consistency = safe_float(data.get("consistency", data.get("coherence", 0.5)))
+            overall = safe_float(data.get("overall_score", data.get("overall", data.get("total_score",
                 0.4 * correctness + 0.35 * completeness + 0.25 * consistency))))
             normalized["score"] = {
                 "correctness": correctness,

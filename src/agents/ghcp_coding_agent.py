@@ -244,15 +244,17 @@ class GHCPCodingAgent:
     async def start(self):
         """Start the Copilot client and create a session."""
         if not COPILOT_SDK_AVAILABLE:
+            logger.error("github-copilot-sdk not available")
             raise RuntimeError(
                 "github-copilot-sdk is not installed. "
                 "Install with: pip install github-copilot-sdk"
             )
         
         if self._started:
+            logger.debug("GHCPCodingAgent already started, skipping")
             return
 
-        logger.info("Starting Copilot client...")
+        logger.info("GHCPCodingAgent starting Copilot client...")
 
         # Build client options based on configuration
         client_options = {}
@@ -264,14 +266,28 @@ class GHCPCodingAgent:
             )
 
         try:
+            logger.debug("Creating CopilotClient", options=client_options or "default")
             self._client = CopilotClient(client_options) if client_options else CopilotClient()
+            
+            logger.debug("Starting CopilotClient...")
             await self._client.start()
+            logger.info("CopilotClient started successfully")
+            
         except FileNotFoundError as e:
+            logger.error(
+                "Copilot CLI not found",
+                error=str(e),
+            )
             raise RuntimeError(
                 "Copilot CLI not found. Please install it with: npm install -g @github/copilot\n"
                 f"Original error: {e}"
             ) from e
         except Exception as e:
+            logger.error(
+                "Failed to start CopilotClient",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             if "WinError 2" in str(e) or "No such file" in str(e):
                 raise RuntimeError(
                     "Copilot CLI not found. Please install it with: npm install -g @github/copilot\n"
@@ -347,39 +363,126 @@ class GHCPCodingAgent:
         Returns:
             Generated response with code, CLI commands, or test plans.
         """
+        logger.info(
+            "GHCPCodingAgent.run started",
+            query_length=len(query),
+            query_preview=query[:100] if query else "",
+        )
+        
         if not self._started:
-            await self.start()
+            logger.debug("GHCPCodingAgent not started, initializing...")
+            try:
+                await self.start()
+            except Exception as e:
+                logger.error(
+                    "GHCPCodingAgent failed to start",
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
+                raise
         
         if not self._session:
+            logger.error("GHCPCodingAgent session is None after start")
             raise RuntimeError("Session not initialized")
         
         # Collect response
         response_parts: list[str] = []
         done = asyncio.Event()
+        error_occurred: Exception | None = None
+        events_received: list[str] = []
         
         def on_event(event):
+            nonlocal error_occurred
             event_type = getattr(event.type, 'value', str(event.type))
+            events_received.append(event_type)
+            
+            logger.debug(
+                "GHCPCodingAgent received event",
+                event_type=event_type,
+            )
+            
             if event_type == "assistant.message":
                 content = getattr(event.data, 'content', '')
                 if content:
                     response_parts.append(content)
+                    logger.debug(
+                        "GHCPCodingAgent message received",
+                        content_length=len(content),
+                    )
             elif event_type == "assistant.message_delta":
                 # Handle streaming deltas
                 content = getattr(event.data, 'content', '')
                 if content:
                     response_parts.append(content)
             elif event_type == "session.idle":
+                logger.debug("GHCPCodingAgent session idle, completing")
+                done.set()
+            elif event_type == "error":
+                # Capture error events
+                error_data = getattr(event, 'data', None)
+                error_msg = str(error_data) if error_data else "Unknown error"
+                logger.error(
+                    "GHCPCodingAgent received error event",
+                    error=error_msg,
+                )
+                error_occurred = RuntimeError(f"Copilot error: {error_msg}")
                 done.set()
         
         self._session.on(on_event)
         
         try:
+            logger.debug("GHCPCodingAgent sending prompt to session")
             await self._session.send({"prompt": query})
+            
+            logger.debug("GHCPCodingAgent waiting for response (timeout=120s)")
             await asyncio.wait_for(done.wait(), timeout=120.0)
+            
+            logger.info(
+                "GHCPCodingAgent response completed",
+                events_received=len(events_received),
+                response_parts=len(response_parts),
+                total_length=sum(len(p) for p in response_parts),
+            )
+            
         except asyncio.TimeoutError:
-            logger.warning("Session response timed out after 120 seconds")
+            logger.warning(
+                "GHCPCodingAgent session timed out",
+                timeout_seconds=120,
+                events_received=events_received,
+                response_parts_collected=len(response_parts),
+            )
+        except Exception as e:
+            logger.error(
+                "GHCPCodingAgent session error",
+                error=str(e),
+                error_type=type(e).__name__,
+                events_received=events_received,
+            )
+            raise
         
-        return "".join(response_parts) if response_parts else "No response generated."
+        # Check for error that occurred during event handling
+        if error_occurred:
+            logger.error(
+                "GHCPCodingAgent error during processing",
+                error=str(error_occurred),
+            )
+            raise error_occurred
+        
+        result = "".join(response_parts) if response_parts else "No response generated."
+        
+        if result == "No response generated.":
+            logger.warning(
+                "GHCPCodingAgent produced empty response",
+                events_received=events_received,
+                query_preview=query[:100],
+            )
+        else:
+            logger.info(
+                "GHCPCodingAgent.run completed successfully",
+                response_length=len(result),
+            )
+        
+        return result
     
     async def close(self):
         """Clean up resources."""

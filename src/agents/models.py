@@ -234,6 +234,7 @@ class AgentResponse:
         execution_steps: Details of each executed step (tool, query, status).
         score_details: Detailed verification scores by dimension.
         plan_rationale: Explanation of why the plan was structured this way.
+        query_category: Classification of the query (factual, howto, architecture, code, complex).
     """
     content: str
     agent_used: str | None = None
@@ -246,6 +247,7 @@ class AgentResponse:
     execution_steps: list[ExecutionStepDetail] = field(default_factory=list)
     score_details: VerificationScoreDetail | None = None
     plan_rationale: str | None = None
+    query_category: str | None = None
 
 
 @dataclass 

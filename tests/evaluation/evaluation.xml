@@ -1,0 +1,453 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Tool Evaluation Tasks for GTM-Agent
+
+This file defines evaluation tasks across all query categories:
+- FACTUAL (5 tasks): Simple fact-based queries
+- HOWTO (5 tasks): Step-by-step procedural queries  
+- ARCHITECTURE (5 tasks): Design and best practices
+- CODE (10 tasks): Code generation (CLI, SDK, IaC)
+- COMPLEX (5 tasks): Multi-tool orchestration
+
+Each task specifies:
+- id: Unique identifier
+- category: Task category for grouping
+- prompt: The user query to evaluate
+- expected: Expected outcomes for scoring
+-->
+<evaluation>
+    <config>
+        <timeout_seconds>300</timeout_seconds>
+        <use_middleware>true</use_middleware>
+        <capture_feedback>true</capture_feedback>
+    </config>
+    
+    <!-- ============================================== -->
+    <!-- FACTUAL Tasks - Simple lookups, fast path     -->
+    <!-- ============================================== -->
+    
+    <task id="factual_001" category="research">
+        <prompt>What is Azure Blob Storage?</prompt>
+        <description>Basic service definition lookup</description>
+        <expected>
+            <routing>FACTUAL</routing>
+            <tools>research</tools>
+            <keywords>object storage,unstructured data,blobs,containers</keywords>
+            <has_citations>true</has_citations>
+            <max_tool_calls>3</max_tool_calls>
+            <max_duration_seconds>60</max_duration_seconds>
+        </expected>
+    </task>
+    
+    <task id="factual_002" category="research">
+        <prompt>What are the storage tiers for Azure Blob Storage?</prompt>
+        <description>Storage tier information lookup</description>
+        <expected>
+            <routing>FACTUAL</routing>
+            <tools>research</tools>
+            <keywords>Hot,Cool,Cold,Archive</keywords>
+            <has_citations>true</has_citations>
+            <max_tool_calls>3</max_tool_calls>
+            <max_duration_seconds>60</max_duration_seconds>
+        </expected>
+    </task>
+    
+    <task id="factual_003" category="research">
+        <prompt>What is the difference between Azure Functions and Logic Apps?</prompt>
+        <description>Service comparison query</description>
+        <expected>
+            <routing>FACTUAL</routing>
+            <tools>research</tools>
+            <keywords>serverless,workflow,code,triggers</keywords>
+            <has_citations>true</has_citations>
+            <max_tool_calls>3</max_tool_calls>
+            <max_duration_seconds>60</max_duration_seconds>
+        </expected>
+    </task>
+    
+    <task id="factual_004" category="research">
+        <prompt>What regions is Azure OpenAI available in?</prompt>
+        <description>Service availability lookup</description>
+        <expected>
+            <routing>FACTUAL</routing>
+            <tools>research</tools>
+            <keywords>East US,West Europe,region</keywords>
+            <has_citations>true</has_citations>
+            <max_tool_calls>3</max_tool_calls>
+            <max_duration_seconds>60</max_duration_seconds>
+        </expected>
+    </task>
+    
+    <task id="factual_005" category="research">
+        <prompt>What are the pricing tiers for Azure App Service?</prompt>
+        <description>Pricing information lookup</description>
+        <expected>
+            <routing>FACTUAL</routing>
+            <tools>research</tools>
+            <keywords>Free,Basic,Standard,Premium</keywords>
+            <has_citations>true</has_citations>
+            <max_tool_calls>3</max_tool_calls>
+            <max_duration_seconds>60</max_duration_seconds>
+        </expected>
+    </task>
+    
+    <!-- ============================================== -->
+    <!-- HOWTO Tasks - Step-by-step procedures         -->
+    <!-- ============================================== -->
+    
+    <task id="howto_001" category="research">
+        <prompt>How do I deploy an Azure Function using GitHub Actions?</prompt>
+        <description>CI/CD deployment steps</description>
+        <expected>
+            <routing>HOWTO</routing>
+            <tools>research</tools>
+            <keywords>workflow,yaml,deploy,publish</keywords>
+            <has_citations>true</has_citations>
+            <max_tool_calls>5</max_tool_calls>
+            <max_duration_seconds>180</max_duration_seconds>
+        </expected>
+    </task>
+    
+    <task id="howto_002" category="research">
+        <prompt>How do I configure VNet integration for Azure App Service?</prompt>
+        <description>Network configuration steps</description>
+        <expected>
+            <routing>HOWTO</routing>
+            <tools>research</tools>
+            <keywords>VNet,subnet,integration,networking</keywords>
+            <has_citations>true</has_citations>
+            <max_tool_calls>5</max_tool_calls>
+            <max_duration_seconds>180</max_duration_seconds>
+        </expected>
+    </task>
+    
+    <task id="howto_003" category="research">
+        <prompt>How do I enable Application Insights for my Azure Function?</prompt>
+        <description>Monitoring setup steps</description>
+        <expected>
+            <routing>HOWTO</routing>
+            <tools>research</tools>
+            <keywords>Application Insights,monitoring,telemetry,connection string,APPLICATIONINSIGHTS</keywords>
+            <has_citations>true</has_citations>
+            <max_tool_calls>5</max_tool_calls>
+            <max_duration_seconds>180</max_duration_seconds>
+        </expected>
+    </task>
+    
+    <task id="howto_004" category="research">
+        <prompt>How do I set up managed identity for Azure App Service to access Key Vault?</prompt>
+        <description>Identity and access configuration</description>
+        <expected>
+            <routing>HOWTO</routing>
+            <tools>research</tools>
+            <keywords>managed identity,Key Vault,access policy,system-assigned</keywords>
+            <has_citations>true</has_citations>
+            <max_tool_calls>5</max_tool_calls>
+            <max_duration_seconds>180</max_duration_seconds>
+        </expected>
+    </task>
+    
+    <task id="howto_005" category="research">
+        <prompt>How do I configure auto-scaling for Azure Kubernetes Service?</prompt>
+        <description>AKS scaling configuration</description>
+        <expected>
+            <routing>HOWTO</routing>
+            <tools>research</tools>
+            <keywords>autoscaler,HPA,cluster autoscaler,nodes</keywords>
+            <has_citations>true</has_citations>
+            <max_tool_calls>5</max_tool_calls>
+            <max_duration_seconds>180</max_duration_seconds>
+        </expected>
+    </task>
+    
+    <!-- ============================================== -->
+    <!-- ARCHITECTURE Tasks - Design and best practices -->
+    <!-- ============================================== -->
+    
+    <task id="arch_001" category="architecture">
+        <prompt>What are the best practices for Azure App Service security?</prompt>
+        <description>Security architecture guidance</description>
+        <expected>
+            <routing>ARCHITECTURE</routing>
+            <tools>architecture</tools>
+            <keywords>authentication,HTTPS,network,identity</keywords>
+            <has_waf_reference>true</has_waf_reference>
+            <max_tool_calls>5</max_tool_calls>
+            <max_duration_seconds>180</max_duration_seconds>
+        </expected>
+    </task>
+    
+    <task id="arch_002" category="architecture">
+        <prompt>How do I design a highly available web application on Azure?</prompt>
+        <description>HA architecture patterns</description>
+        <expected>
+            <routing>ARCHITECTURE</routing>
+            <tools>architecture</tools>
+            <keywords>availability,redundancy,load balancer,regions</keywords>
+            <has_waf_reference>true</has_waf_reference>
+            <max_tool_calls>5</max_tool_calls>
+            <max_duration_seconds>180</max_duration_seconds>
+        </expected>
+    </task>
+    
+    <task id="arch_003" category="architecture">
+        <prompt>What are the cost optimization strategies for Azure Kubernetes Service?</prompt>
+        <description>Cost optimization guidance</description>
+        <expected>
+            <routing>ARCHITECTURE</routing>
+            <tools>architecture</tools>
+            <keywords>cost,optimization,spot,reserved,savings,autoscaler,scale</keywords>
+            <has_waf_reference>true</has_waf_reference>
+            <max_tool_calls>5</max_tool_calls>
+            <max_duration_seconds>180</max_duration_seconds>
+        </expected>
+    </task>
+    
+    <task id="arch_004" category="architecture">
+        <prompt>How do I implement the reliability pillar of the Well-Architected Framework for my Azure solution?</prompt>
+        <description>WAF pillar implementation</description>
+        <expected>
+            <routing>ARCHITECTURE</routing>
+            <tools>architecture</tools>
+            <keywords>reliability,availability,recovery,resilience</keywords>
+            <has_waf_reference>true</has_waf_reference>
+            <max_tool_calls>5</max_tool_calls>
+            <max_duration_seconds>180</max_duration_seconds>
+        </expected>
+    </task>
+    
+    <task id="arch_005" category="architecture">
+        <prompt>What is the recommended architecture for a multi-tenant SaaS application on Azure?</prompt>
+        <description>SaaS architecture patterns</description>
+        <expected>
+            <routing>ARCHITECTURE</routing>
+            <tools>architecture</tools>
+            <keywords>multi-tenant,isolation,scaling,identity</keywords>
+            <has_waf_reference>true</has_waf_reference>
+            <max_tool_calls>5</max_tool_calls>
+            <max_duration_seconds>180</max_duration_seconds>
+        </expected>
+    </task>
+    
+    <!-- ============================================== -->
+    <!-- CODE Tasks - CLI Commands                      -->
+    <!-- ============================================== -->
+    
+    <task id="code_cli_001" category="code">
+        <prompt>Give me the Azure CLI commands to create a storage account with private endpoint</prompt>
+        <description>CLI command generation for storage</description>
+        <expected>
+            <routing>CODE</routing>
+            <tools>code</tools>
+            <has_code_block>true</has_code_block>
+            <code_patterns>az storage account create,--name,private-endpoint</code_patterns>
+            <max_tool_calls>3</max_tool_calls>
+            <max_duration_seconds>120</max_duration_seconds>
+        </expected>
+    </task>
+    
+    <task id="code_cli_002" category="code">
+        <prompt>Write the Azure CLI commands to create a resource group and deploy an App Service Plan</prompt>
+        <description>CLI commands for App Service setup</description>
+        <expected>
+            <routing>CODE</routing>
+            <tools>code</tools>
+            <has_code_block>true</has_code_block>
+            <code_patterns>az group create,az appservice plan create,--sku</code_patterns>
+            <max_tool_calls>3</max_tool_calls>
+            <max_duration_seconds>120</max_duration_seconds>
+        </expected>
+    </task>
+    
+    <task id="code_cli_003" category="code">
+        <prompt>Generate Azure CLI commands to create an AKS cluster with managed identity</prompt>
+        <description>CLI commands for AKS deployment</description>
+        <expected>
+            <routing>CODE</routing>
+            <tools>code</tools>
+            <has_code_block>true</has_code_block>
+            <code_patterns>az aks create,--enable-managed-identity,--node-count</code_patterns>
+            <max_tool_calls>3</max_tool_calls>
+            <max_duration_seconds>120</max_duration_seconds>
+        </expected>
+    </task>
+    
+    <!-- ============================================== -->
+    <!-- CODE Tasks - SDK Code                          -->
+    <!-- ============================================== -->
+    
+    <task id="code_sdk_001" category="code">
+        <prompt>Write Python code to upload a file to Azure Blob Storage using the SDK</prompt>
+        <description>Python SDK code for blob upload</description>
+        <expected>
+            <routing>CODE</routing>
+            <tools>code</tools>
+            <has_code_block>true</has_code_block>
+            <code_patterns>BlobServiceClient,upload_blob,azure.storage.blob</code_patterns>
+            <max_tool_calls>3</max_tool_calls>
+            <max_duration_seconds>120</max_duration_seconds>
+        </expected>
+    </task>
+    
+    <task id="code_sdk_002" category="code">
+        <prompt>Write Python code to send a message to Azure Service Bus queue</prompt>
+        <description>Python SDK code for Service Bus</description>
+        <expected>
+            <routing>CODE</routing>
+            <tools>code</tools>
+            <has_code_block>true</has_code_block>
+            <code_patterns>ServiceBusClient,send_messages,azure.servicebus</code_patterns>
+            <max_tool_calls>3</max_tool_calls>
+            <max_duration_seconds>120</max_duration_seconds>
+        </expected>
+    </task>
+    
+    <task id="code_sdk_003" category="code">
+        <prompt>Generate C# code to read secrets from Azure Key Vault</prompt>
+        <description>C# SDK code for Key Vault</description>
+        <expected>
+            <routing>CODE</routing>
+            <tools>code</tools>
+            <has_code_block>true</has_code_block>
+            <code_patterns>SecretClient,GetSecret,Azure.Security.KeyVault</code_patterns>
+            <max_tool_calls>3</max_tool_calls>
+            <max_duration_seconds>120</max_duration_seconds>
+        </expected>
+    </task>
+    
+    <!-- ============================================== -->
+    <!-- CODE Tasks - Infrastructure as Code            -->
+    <!-- ============================================== -->
+    
+    <task id="code_iac_001" category="code">
+        <prompt>Generate Bicep code to deploy an Azure App Service with a SQL Database</prompt>
+        <description>Bicep template for App Service + SQL</description>
+        <expected>
+            <routing>CODE</routing>
+            <tools>code</tools>
+            <has_code_block>true</has_code_block>
+            <code_patterns>Microsoft.Web/sites,Microsoft.Sql/servers,resource</code_patterns>
+            <max_tool_calls>3</max_tool_calls>
+            <max_duration_seconds>120</max_duration_seconds>
+        </expected>
+    </task>
+    
+    <task id="code_iac_002" category="code">
+        <prompt>Create Terraform code to deploy an AKS cluster with managed identity</prompt>
+        <description>Terraform for AKS deployment</description>
+        <expected>
+            <routing>CODE</routing>
+            <tools>code</tools>
+            <has_code_block>true</has_code_block>
+            <code_patterns>azurerm_kubernetes_cluster,identity,resource</code_patterns>
+            <max_tool_calls>3</max_tool_calls>
+            <max_duration_seconds>120</max_duration_seconds>
+        </expected>
+    </task>
+    
+    <task id="code_iac_003" category="code">
+        <prompt>Write Bicep code to create a Virtual Network with three subnets</prompt>
+        <description>Bicep template for VNet</description>
+        <expected>
+            <routing>CODE</routing>
+            <tools>code</tools>
+            <has_code_block>true</has_code_block>
+            <code_patterns>Microsoft.Network/virtualNetworks,subnets,addressPrefix</code_patterns>
+            <max_tool_calls>3</max_tool_calls>
+            <max_duration_seconds>120</max_duration_seconds>
+        </expected>
+    </task>
+    
+    <task id="code_iac_004" category="code">
+        <prompt>Generate ARM template for an Azure Function App with Application Insights</prompt>
+        <description>ARM template for Function App</description>
+        <expected>
+            <routing>CODE</routing>
+            <tools>code</tools>
+            <has_code_block>true</has_code_block>
+            <code_patterns>Microsoft.Web/sites,Microsoft.Insights/components,functionapp</code_patterns>
+            <max_tool_calls>3</max_tool_calls>
+            <max_duration_seconds>120</max_duration_seconds>
+        </expected>
+    </task>
+    
+    <!-- ============================================== -->
+    <!-- COMPLEX Tasks - Multi-tool orchestration       -->
+    <!-- ============================================== -->
+    
+    <task id="complex_001" category="complex">
+        <prompt>Design a microservices architecture for an e-commerce platform on Azure with API Gateway, message queues, and database recommendations. Include sample Bicep code for the API Gateway configuration.</prompt>
+        <description>Full architecture with IaC code</description>
+        <expected>
+            <routing>COMPLEX</routing>
+            <tools>architecture,code</tools>
+            <keywords>API Management,Service Bus,microservices</keywords>
+            <has_code_block>true</has_code_block>
+            <has_waf_reference>true</has_waf_reference>
+            <min_steps>2</min_steps>
+            <max_tool_calls>8</max_tool_calls>
+            <max_duration_seconds>300</max_duration_seconds>
+        </expected>
+    </task>
+    
+    <task id="complex_002" category="complex">
+        <prompt>Help me plan a migration from on-premises SQL Server to Azure, including best practices, step-by-step approach, and the Azure CLI commands needed to create the target Azure SQL Database.</prompt>
+        <description>Migration planning with CLI commands</description>
+        <expected>
+            <routing>COMPLEX</routing>
+            <tools>research,code</tools>
+            <keywords>migration,assessment,DMS,Azure SQL</keywords>
+            <has_code_block>true</has_code_block>
+            <has_citations>true</has_citations>
+            <min_steps>2</min_steps>
+            <max_tool_calls>8</max_tool_calls>
+            <max_duration_seconds>300</max_duration_seconds>
+        </expected>
+    </task>
+    
+    <task id="complex_003" category="complex">
+        <prompt>I need to implement zero-trust security for my Azure environment. Provide the architecture recommendations, best practices, and Bicep templates for configuring Azure Firewall and Private Endpoints.</prompt>
+        <description>Security architecture with IaC</description>
+        <expected>
+            <routing>COMPLEX</routing>
+            <tools>architecture,code</tools>
+            <keywords>zero-trust,firewall,private endpoint,security</keywords>
+            <has_code_block>true</has_code_block>
+            <has_waf_reference>true</has_waf_reference>
+            <min_steps>2</min_steps>
+            <max_tool_calls>8</max_tool_calls>
+            <max_duration_seconds>300</max_duration_seconds>
+        </expected>
+    </task>
+    
+    <task id="complex_004" category="complex">
+        <prompt>Design a data analytics solution on Azure for processing IoT sensor data. Include architecture recommendations using Event Hubs and Stream Analytics, plus sample code for an Azure Function to process the events.</prompt>
+        <description>IoT analytics architecture with code</description>
+        <expected>
+            <routing>COMPLEX</routing>
+            <tools>architecture,code</tools>
+            <keywords>Event Hubs,Stream Analytics,IoT,Function</keywords>
+            <has_code_block>true</has_code_block>
+            <has_waf_reference>true</has_waf_reference>
+            <min_steps>2</min_steps>
+            <max_tool_calls>8</max_tool_calls>
+            <max_duration_seconds>300</max_duration_seconds>
+        </expected>
+    </task>
+    
+    <task id="complex_005" category="complex">
+        <prompt>Create a disaster recovery plan for an Azure web application. Include the architecture for multi-region deployment, best practices for data replication, and Terraform code for setting up Traffic Manager.</prompt>
+        <description>DR architecture with Terraform</description>
+        <expected>
+            <routing>COMPLEX</routing>
+            <tools>architecture,code</tools>
+            <keywords>disaster recovery,Traffic Manager,replication,failover</keywords>
+            <has_code_block>true</has_code_block>
+            <has_waf_reference>true</has_waf_reference>
+            <min_steps>2</min_steps>
+            <max_tool_calls>8</max_tool_calls>
+            <max_duration_seconds>300</max_duration_seconds>
+        </expected>
+    </task>
+    
+</evaluation>

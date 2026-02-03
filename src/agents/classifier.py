@@ -50,30 +50,35 @@ class QueryCategory(str, Enum):
                 "max_iterations": 1,
                 "skip_pev": True,
                 "threshold": None,  # No verification
+                "early_accept_threshold": None,
                 "default_tool": "research",
             },
             QueryCategory.HOWTO: {
-                "max_iterations": 1,
+                "max_iterations": 1,  # Single iteration to prevent timeouts
                 "skip_pev": False,
-                "threshold": 0.7,
+                "threshold": 0.70,  # Standard threshold
+                "early_accept_threshold": 0.85,  # Accept immediately if high quality
                 "default_tool": "research",
             },
             QueryCategory.ARCHITECTURE: {
                 "max_iterations": 2,
                 "skip_pev": False,
-                "threshold": 0.75,
+                "threshold": 0.75,  # Standard threshold for architecture
+                "early_accept_threshold": 0.90,
                 "default_tool": "architecture",
             },
             QueryCategory.CODE: {
                 "max_iterations": 1,
                 "skip_pev": False,
-                "threshold": 0.7,
+                "threshold": 0.70,  # Standard threshold for code tasks
+                "early_accept_threshold": 0.85,
                 "default_tool": "code",
             },
             QueryCategory.COMPLEX: {
-                "max_iterations": 4,
+                "max_iterations": 2,  # Reduced from 3 to avoid extreme timeouts
                 "skip_pev": False,
-                "threshold": 0.8,
+                "threshold": 0.70,  # Accept good quality to complete within time budget
+                "early_accept_threshold": 0.80,  # Accept immediately if high quality
                 "default_tool": None,  # Let planner decide
             },
         }

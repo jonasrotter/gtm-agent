@@ -35,6 +35,7 @@ Always cite your sources with URLs.
 3. **Find Code**: Use code sample search for implementation examples
 4. **Cite Sources**: Always include source URLs in your response
 5. **Feature Status**: Note whether features are GA, Preview, or Deprecated
+6. **Be Comprehensive**: Include specific technical terms (e.g., for storage: Hot/Cool/Cold/Archive tiers; for monitoring: connection string, telemetry; for deployment: workflow, yaml)
 
 ## Response Format
 

@@ -7,8 +7,13 @@ Environment variables are loaded from .env file or system environment.
 from functools import lru_cache
 from typing import Literal
 
+from dotenv import load_dotenv
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Load .env file into os.environ BEFORE anything else
+# This ensures Azure SDK's DefaultAzureCredential can find service principal credentials
+load_dotenv()
 
 
 class Settings(BaseSettings):
@@ -106,6 +111,28 @@ class Settings(BaseSettings):
     mcp_timeout_seconds: int = Field(
         default=30,
         description="Timeout for MCP tool calls in seconds",
+    )
+    
+    # Timeout Configuration
+    api_request_timeout_seconds: int = Field(
+        default=300,
+        description="Maximum time for a single API request in seconds (increased for architecture queries)",
+    )
+    api_complex_timeout_seconds: int = Field(
+        default=360,
+        description="Extended timeout for complex multi-step queries in seconds",
+    )
+    pev_loop_timeout_seconds: int = Field(
+        default=240,
+        description="Maximum cumulative time for the Plan-Execute-Verify loop in seconds",
+    )
+    pev_complex_timeout_seconds: int = Field(
+        default=330,
+        description="Extended PEV loop timeout for complex queries in seconds",
+    )
+    step_execution_timeout_seconds: int = Field(
+        default=90,  # Increased to handle slow MCP/architecture calls
+        description="Timeout for each step execution in seconds",
     )
 
     # GitHub Copilot SDK Configuration

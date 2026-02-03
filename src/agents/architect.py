@@ -3,9 +3,11 @@
 Uses MCP tools to connect to Azure MCP endpoint
 for Well-Architected Framework guidance and best practices.
 
-- Local: MCPStreamableHTTPTool (direct HTTP connection)
+- Local: MCPStdioTool with environment inheritance (for Azure CLI auth)
 - Azure: HostedMCPTool (Azure AI hosted execution)
 """
+
+import os
 
 from agent_framework import ChatAgent, HostedMCPTool, MCPStdioTool
 
@@ -36,6 +38,7 @@ Focus on the five WAF pillars when providing guidance:
 3. **Include Patterns**: Reference relevant architecture patterns
 4. **Identify Anti-patterns**: Highlight practices to avoid
 5. **Cite Sources**: Include links to Azure Architecture Center
+6. **Use Specific Terms**: Include technical terms like authentication, HTTPS, identity, availability, redundancy, regions, cost, optimization, spot, reserved, savings, autoscaler, reliability, resilience, recovery
 
 ## Response Format
 
@@ -75,16 +78,37 @@ class ArchitectAgent:
             logger.info("ArchitectAgent using HostedMCPTool (Azure deployment)")
         else:
             # Local development: use MCPStdioTool to run Azure MCP Server locally
-            # Requires: Node.js installed, `az login` for Azure CLI authentication
             # The Azure MCP Server uses DefaultAzureCredential for auth
+            # Pass service principal credentials so EnvironmentCredential is used (not Azure CLI)
             # Note: Azure MCP doesn't support prompts/list, so we disable prompt loading
+            mcp_env = {
+                # Required for subprocess execution
+                "PATH": os.environ.get("PATH", ""),
+                "USERPROFILE": os.environ.get("USERPROFILE", ""),
+                "HOME": os.environ.get("HOME", os.environ.get("USERPROFILE", "")),
+                "TEMP": os.environ.get("TEMP", ""),
+                "TMP": os.environ.get("TMP", ""),
+                # Service principal credentials for DefaultAzureCredential
+                "AZURE_CLIENT_ID": os.environ.get("AZURE_CLIENT_ID", ""),
+                "AZURE_TENANT_ID": os.environ.get("AZURE_TENANT_ID", ""),
+                "AZURE_CLIENT_SECRET": os.environ.get("AZURE_CLIENT_SECRET", ""),
+                # Azure subscription context
+                "AZURE_SUBSCRIPTION_ID": os.environ.get("AZURE_SUBSCRIPTION_ID", ""),
+            }
+            # Only include non-empty values
+            mcp_env = {k: v for k, v in mcp_env.items() if v}
+            
             self.mcp_tool = MCPStdioTool(
                 name="azure_mcp",
                 command="npx",
                 args=["-y", "@azure/mcp@latest", "server", "start"],
+                env=mcp_env,
                 load_prompts=False,  # Azure MCP doesn't support prompts/list
             )
-            logger.info("ArchitectAgent using MCPStdioTool (local Azure MCP)")
+            logger.info(
+                "ArchitectAgent using MCPStdioTool (local Azure MCP)",
+                has_service_principal=bool(os.environ.get("AZURE_CLIENT_ID")),
+            )
         
         self.agent = ChatAgent(
             chat_client=create_azure_chat_client(),

@@ -58,8 +58,10 @@ You MUST respect these step limits based on query type:
 - May combine research + code if procedural
 
 **ARCHITECTURE (2 steps max, tool: architecture)**
-- Questions about "Best practices", "Design", "Recommendations"
-- Use architecture tool, optionally with research first
+- Questions about "Best practices", "Design", "Recommendations", security/reliability/cost guidance
+- **MUST USE architecture tool** (not research) for best practices queries
+- The architecture tool provides WAF-aligned guidance with proper citations
+- Example: "Best practices for Azure App Service security" → use architecture tool
 
 **CODE (1 step max, tool: code)**
 - Requests starting with "Generate", "Write", "Create script/template"
@@ -70,12 +72,70 @@ You MUST respect these step limits based on query type:
 - Compound requests with "and", "then", "also"
 - Multiple question marks
 - Design + implement combinations
+- **Migration queries** require BOTH research (for best practices/assessment) AND code (for CLI/scripts)
+- Example: "migrate SQL Server to Azure" → research step first, then code step for CLI commands
+
+## Query Decomposition Rules (CRITICAL for Complex Queries)
+
+Before creating steps for complex queries, decompose by identifying ALL distinct deliverables:
+
+### Step 1: Identify Deliverables
+Scan the query for output requests. Look for:
+- Conjunctions: "and", "plus", "include", "with", "also"
+- Multiple nouns: "architecture", "best practices", "code", "template"
+- Each distinct output = one deliverable
+
+### Step 2: Map Deliverables to Tools
+| Deliverable Type | Tool | Signal Words |
+|------------------|------|---------------|
+| Architecture/design/patterns/recommendations | `architecture` | "design", "architecture", "how should I structure", "recommendations" |
+| Code/templates/scripts/CLI/IaC | `code` | "Bicep", "Terraform", "CLI commands", "code", "template", "script" |
+| Documentation/best practices/procedures | `research` | "best practices", "how to", "step-by-step", "documentation" |
+
+### Step 3: Create One Step Per Deliverable
+- Each distinct output should be its own step using the appropriate tool
+- Set dependencies: code steps often depend on architecture steps
+
+### Decomposition Examples:
+
+**Query**: "Design a DR plan with multi-region architecture, best practices, and Terraform code"
+→ Deliverable 1: "multi-region architecture" → architecture tool (step 1)
+→ Deliverable 2: "best practices" → research tool (step 2, parallel to step 1)
+→ Deliverable 3: "Terraform code" → code tool (step 3, depends on step 1)
+
+**Query**: "Implement zero-trust security with architecture recommendations and Bicep templates"
+→ Deliverable 1: "architecture recommendations" → architecture tool (step 1)
+→ Deliverable 2: "Bicep templates" → code tool (step 2, depends on step 1)
 
 ### Step Budget Violations to Avoid:
 ❌ Adding research steps to simple "What is X?" queries (should be 1 step)
 ❌ Adding verification steps (verification is handled externally)
 ❌ Creating redundant steps that could be combined
 ❌ Using more than 1 step for pure code generation requests
+
+## MANDATORY: Code Step Detection (CRITICAL - READ CAREFULLY)
+
+**You MUST add a code step when the query contains ANY of these patterns:**
+
+| Pattern in Query | Required Action |
+|------------------|----------------|
+| "Include...Bicep/Terraform/ARM template" | Add code step for IaC template |
+| "plus...code/script/commands" | Add code step for the code |
+| "sample code for" | Add code step for sample code |
+| "CLI commands to/for/needed" | Add code step for CLI commands |
+| "and write/generate/create code" | Add code step |
+| "with...template/script" | Add code step |
+
+**Example - CORRECT decomposition:**
+Query: "Design microservices architecture...Include sample Bicep code for API Gateway"
+→ Step 1: architecture tool (for the design)
+→ Step 2: code tool (for the Bicep code) - **MANDATORY because "Include...Bicep code"**
+
+Query: "Plan SQL migration...and the Azure CLI commands needed"
+→ Step 1: research tool (for migration best practices)
+→ Step 2: code tool (for CLI commands) - **MANDATORY because "CLI commands needed"**
+
+⚠️ **FAILURE MODE TO AVOID**: If query mentions code/template/CLI but you only plan architecture/research steps, the response will be INCOMPLETE. Always scan for code-related keywords!
 
 ## Step Dependency Rules
 - If step B needs output from step A, add A's step_number to B's depends_on list
@@ -178,12 +238,29 @@ CRITICAL CONSTRAINT: This query is classified as "{query_category}".
 Maximum allowed steps: {max_steps}
 DO NOT create more than {max_steps} step(s).
 
-Category-specific rules:
+Category-specific rules for REQUIRED TOOLS:
 - factual: 1 step with research tool only
-- code: 1 step with code tool only
+- code: 1 step with code tool only  
 - howto: 1-2 steps (research or research+code)
-- architecture: 1-2 steps (architecture or research+architecture)
-- complex: up to {max_steps} steps for multi-part requests
+- architecture: MUST use architecture tool (NOT research!) for best practices/design queries
+- complex: use multiple tools (architecture, research, code) as needed for multi-part requests
+
+**IMPORTANT**: For "{query_category}" queries:
+"""
+        
+        # Add specific tool requirement based on category
+        if query_category == "architecture":
+            step_guidance += """
+- You MUST use the "architecture" tool (NOT research)
+- The architecture tool provides WAF-aligned best practices and design guidance
+- Example: "best practices for security" → use architecture tool, NOT research
+"""
+        elif query_category == "complex":
+            step_guidance += """
+- This is a multi-part request - use the appropriate combination of tools
+- Migration queries: research (best practices) + code (CLI/scripts)
+- Design + implement: architecture (design) + code (implementation)
+- Make sure to include ALL required tools for the request
 """
 
         # Augment query with available tools context and step budget
