@@ -1,19 +1,25 @@
-# Core dependencies - generated from pyproject.toml
-fastapi>=0.115.0
-uvicorn[standard]>=0.30.0
-pydantic>=2.0.0
-pydantic-settings>=2.0.0
+# Core dependencies
+fastapi==0.128.0
+uvicorn[standard]==0.40.0
+pydantic==2.12.5
+pydantic-settings==2.12.0
 agent-framework==1.0.0b260123
-github-copilot-sdk>=0.1.18
-httpx>=0.27.0
-structlog>=24.0.0
-opentelemetry-api>=1.20.0
-opentelemetry-sdk>=1.20.0
-opentelemetry-instrumentation-fastapi>=0.44b0
-azure-identity>=1.15.0
+github-copilot-sdk==0.1.18
+httpx==0.28.1
+structlog==25.5.0
+
+# Observability
+opentelemetry-api==1.39.1
+opentelemetry-sdk==1.39.1
+opentelemetry-instrumentation-fastapi==0.60b1
+
+# Azure
+azure-identity==1.25.1
+azure-ai-projects==2.0.0b3
+azure-search-documents==11.7.0b2
 
 # MCP Server support
-mcp[cli]
+mcp==1.25.0
 
 # Production server
 gunicorn>=21.0.0
