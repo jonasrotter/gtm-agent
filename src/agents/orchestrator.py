@@ -660,16 +660,3 @@ class OrchestratorAgent:
 def get_orchestrator_agent() -> OrchestratorAgent:
     """Get an OrchestratorAgent instance."""
     return OrchestratorAgent()
-
-
-# Backwards compatibility alias
-def get_solution_engineer_agent() -> OrchestratorAgent:
-    """
-    Backwards compatibility alias for get_orchestrator_agent.
-    
-    Deprecated: Use get_orchestrator_agent() instead.
-    """
-    logger.warning(
-        "get_solution_engineer_agent() is deprecated, use get_orchestrator_agent()"
-    )
-    return get_orchestrator_agent()

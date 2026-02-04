@@ -16,7 +16,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 
-from src.agents.solution_engineer import SolutionEngineerAgent
+from src.agents.orchestrator import OrchestratorAgent
 from src.utils.logging import get_logger
 
 
@@ -40,15 +40,15 @@ mcp = FastMCP(
 
 
 # Global agent instance (lazily initialized)
-_agent: SolutionEngineerAgent | None = None
+_agent: OrchestratorAgent | None = None
 
 
-def _get_agent() -> SolutionEngineerAgent:
-    """Get or create the SolutionEngineerAgent instance."""
+def _get_agent() -> OrchestratorAgent:
+    """Get or create the OrchestratorAgent instance."""
     global _agent
     if _agent is None:
-        _agent = SolutionEngineerAgent()
-        logger.info("MCP: Initialized SolutionEngineerAgent")
+        _agent = OrchestratorAgent()
+        logger.info("MCP: Initialized OrchestratorAgent")
     return _agent
 
 
@@ -76,7 +76,7 @@ async def mcp_lifespan(app: Any):
             if _agent is not None:
                 await _agent.close()
                 _agent = None
-                logger.info("MCP: Cleaned up SolutionEngineerAgent")
+                logger.info("MCP: Cleaned up OrchestratorAgent")
 
 
 # =============================================================================

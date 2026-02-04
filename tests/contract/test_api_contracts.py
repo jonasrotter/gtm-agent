@@ -192,7 +192,7 @@ class TestErrorResponses:
     def mock_client(self) -> TestClient:
         """Create a test client with mocked agent dependency."""
         from src.api.main import create_app
-        from src.api.dependencies import get_solution_engineer_agent
+        from src.api.dependencies import get_orchestrator_agent
         from src.agents.models import AgentResponse
         
         mock_agent = MagicMock()
@@ -202,7 +202,7 @@ class TestErrorResponses:
         ))
         
         app = create_app()
-        app.dependency_overrides[get_solution_engineer_agent] = lambda: mock_agent
+        app.dependency_overrides[get_orchestrator_agent] = lambda: mock_agent
         
         return TestClient(app)
 

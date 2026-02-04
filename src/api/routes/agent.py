@@ -11,14 +11,14 @@ from typing import TYPE_CHECKING, Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
-from src.api.dependencies import get_solution_engineer_agent
+from src.api.dependencies import get_orchestrator_agent
 from src.agents.classifier import QueryClassifier
 from src.config import get_settings
 from src.utils.logging import get_logger
 
 
 if TYPE_CHECKING:
-    from src.agents.solution_engineer import SolutionEngineerAgent
+    from src.agents.orchestrator import OrchestratorAgent
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -139,7 +139,7 @@ class ErrorResponse(BaseModel):
 )
 async def query_agent(
     request: QueryRequest,
-    agent: Annotated["SolutionEngineerAgent", Depends(get_solution_engineer_agent)],
+    agent: Annotated["OrchestratorAgent", Depends(get_orchestrator_agent)],
 ) -> QueryResponse:
     """
     Process a user query and return an agent response.
@@ -151,7 +151,7 @@ async def query_agent(
 
     Args:
         request: The query request containing the user's question.
-        agent: SolutionEngineerAgent instance (injected).
+        agent: OrchestratorAgent instance (injected).
 
     Returns:
         QueryResponse with the agent's answer.
@@ -181,7 +181,7 @@ async def query_agent(
             timeout_seconds=timeout,
         )
 
-        # Process query through SolutionEngineerAgent with timeout protection
+        # Process query through OrchestratorAgent with timeout protection
         try:
             agent_response = await asyncio.wait_for(
                 agent.run(request.content, session_id=request.session_id),

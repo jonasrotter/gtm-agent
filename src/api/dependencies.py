@@ -62,20 +62,20 @@ def get_ghcp_coding_agent() -> "GHCPCodingAgent":
 
 
 @lru_cache
-def get_solution_engineer_agent() -> "OrchestratorAgent":
+def get_orchestrator_agent() -> "OrchestratorAgent":
     """
     Get OrchestratorAgent singleton.
 
     Returns:
         Shared OrchestratorAgent instance using Plan-Execute-Verify pattern.
-    
-    Note:
-        This function is named get_solution_engineer_agent for backwards compatibility.
-        Internally uses OrchestratorAgent which replaces SolutionEngineerAgent.
     """
     from src.agents.orchestrator import OrchestratorAgent  # noqa: PLC0415
 
     return OrchestratorAgent()
+
+
+# Backwards compatibility alias - deprecated
+get_solution_engineer_agent = get_orchestrator_agent
 
 
 async def verify_api_key(

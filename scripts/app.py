@@ -16,10 +16,6 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
 
-print(f"App directory: {current_dir}")
-print(f"Python path: {sys.path}")
-print(f"Directory contents: {os.listdir(current_dir)}")
-
 # Now we can import the FastAPI app
 from src.api import app
 

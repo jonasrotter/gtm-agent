@@ -8,7 +8,7 @@ from functools import lru_cache
 from typing import Literal
 
 from dotenv import load_dotenv
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Load .env file into os.environ BEFORE anything else
@@ -51,9 +51,15 @@ class Settings(BaseSettings):
     )
 
     # API Security
-    api_key: str = Field(
-        default="",
-        description="API key for authentication (empty allows all requests in dev)",
+    api_key: SecretStr | None = Field(
+        default=None,
+        description="API key for authentication (None allows all requests in dev)",
+    )
+    
+    # CORS Configuration
+    cors_allowed_origins: list[str] = Field(
+        default=["*"],
+        description="Allowed CORS origins. Use ['*'] for development only.",
     )
 
     # Logging Configuration
@@ -171,7 +177,7 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         """Check if running in production mode."""
-        return not self.debug and self.api_key != ""
+        return not self.debug and self.api_key is not None
 
     @property
     def has_azure_config(self) -> bool:

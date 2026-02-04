@@ -168,41 +168,19 @@ class TestGHCPCodingAgent:
         assert generate_cli_command.name == 'generate_cli_command'
 
 
-class TestSolutionEngineerAgent:
-    """Tests for the SolutionEngineerAgent."""
+class TestOrchestratorAgentCompat:
+    """Tests for OrchestratorAgent backwards compatibility."""
     
-    def test_solution_engineer_module_imports(self) -> None:
-        """SolutionEngineerAgent can be imported."""
-        from src.agents.solution_engineer import SolutionEngineerAgent, get_solution_engineer_agent
-        assert SolutionEngineerAgent is not None
-        assert callable(get_solution_engineer_agent)
+    def test_solution_engineer_alias_exists(self) -> None:
+        """SolutionEngineerAgent alias exists for backwards compatibility."""
+        from src.agents import SolutionEngineerAgent, OrchestratorAgent
+        assert SolutionEngineerAgent is OrchestratorAgent
 
-    def test_solution_engineer_has_sub_agents(self) -> None:
-        """SolutionEngineerAgent creates sub-agents."""
-        with patch.dict('os.environ', {
-            'AZURE_OPENAI_ENDPOINT': 'https://test.openai.azure.com',
-            'AZURE_OPENAI_DEPLOYMENT': 'gpt-4o',
-        }):
-            from src.agents.solution_engineer import SolutionEngineerAgent
-            
-            agent = SolutionEngineerAgent()
-            assert hasattr(agent, 'researcher')
-            assert hasattr(agent, 'architect')
-            assert hasattr(agent, 'ghcp_coding')
-            assert hasattr(agent, 'agent')
-
-    def test_solution_engineer_has_run_method(self) -> None:
-        """SolutionEngineerAgent has async run method."""
-        with patch.dict('os.environ', {
-            'AZURE_OPENAI_ENDPOINT': 'https://test.openai.azure.com',
-            'AZURE_OPENAI_DEPLOYMENT': 'gpt-4o',
-        }):
-            from src.agents.solution_engineer import SolutionEngineerAgent
-            import inspect
-            
-            agent = SolutionEngineerAgent()
-            assert hasattr(agent, 'run')
-            assert inspect.iscoroutinefunction(agent.run)
+    def test_orchestrator_agent_imports(self) -> None:
+        """OrchestratorAgent can be imported."""
+        from src.agents.orchestrator import OrchestratorAgent, get_orchestrator_agent
+        assert OrchestratorAgent is not None
+        assert callable(get_orchestrator_agent)
 
 
 class TestAgentsInit:
@@ -214,10 +192,10 @@ class TestAgentsInit:
             ResearcherAgent,
             ArchitectAgent,
             GHCPCodingAgent,
-            SolutionEngineerAgent,
+            OrchestratorAgent,
         )
         
         assert ResearcherAgent is not None
         assert ArchitectAgent is not None
         assert GHCPCodingAgent is not None
-        assert SolutionEngineerAgent is not None
+        assert OrchestratorAgent is not None

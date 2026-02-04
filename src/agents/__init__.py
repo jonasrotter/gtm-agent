@@ -26,7 +26,7 @@ from src.agents.models import (
     VerificationScoreDetail,
 )
 
-# Backwards compatibility alias
+# Backwards compatibility alias (deprecated - use OrchestratorAgent directly)
 SolutionEngineerAgent = OrchestratorAgent
 
 
@@ -48,6 +48,4 @@ __all__ = [
     "AgentResponse",
     "ExecutionStepDetail",
     "VerificationScoreDetail",
-    # Backwards compatibility
-    "SolutionEngineerAgent",
 ]

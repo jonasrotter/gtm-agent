@@ -552,18 +552,15 @@ class TestOrchestratorAgent:
         'AZURE_OPENAI_DEPLOYMENT': 'gpt-4o',
     })
     def test_orchestrator_backwards_compatibility(self) -> None:
-        """get_solution_engineer_agent returns OrchestratorAgent."""
+        """get_orchestrator_agent returns OrchestratorAgent."""
         from src.agents.orchestrator import (
             get_orchestrator_agent,
-            get_solution_engineer_agent,
             OrchestratorAgent,
         )
         
-        agent1 = get_orchestrator_agent()
-        agent2 = get_solution_engineer_agent()
+        agent = get_orchestrator_agent()
         
-        assert isinstance(agent1, OrchestratorAgent)
-        assert isinstance(agent2, OrchestratorAgent)
+        assert isinstance(agent, OrchestratorAgent)
     
     @patch.dict('os.environ', {
         'AZURE_OPENAI_ENDPOINT': 'https://test.openai.azure.com',
