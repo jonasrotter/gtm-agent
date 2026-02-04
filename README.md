@@ -4,7 +4,7 @@ AI assistant for Azure Solution Engineers. Research docs, get architecture guida
 
 ## Prerequisites
 
-- **Python 3.11+** (tested with 3.11)
+- **Python 3.11+** (tested with 3.13)
 - **Azure OpenAI** resource with a deployed model (e.g., `gpt-4o` or `gpt-5.2`)
 - **Azure CLI** (optional, for deployment)
 
